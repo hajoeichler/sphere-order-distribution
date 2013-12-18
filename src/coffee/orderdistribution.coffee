@@ -30,6 +30,16 @@ class OrderDistribution
 
   run: (masterOrders, callback) ->
     throw new Error 'Callback must be a function!' unless _.isFunction callback
+    # workflow:
+    # find orders that have an empty export array
+    # filter orders that do not fit the retailer channel key
+    # each order
+    #   get all SKUs from lineitems
+    #   get all products for the SKUs (in attribute masterSKU) from retailer project
+    #   exchange all SKUs in oder
+    #   remove channel information in order
+    #   import order into retailer and get order id
+    #   add export info to corresponding order in master
     @returnResult true, 'Nothing to do.', callback
 
   returnResult: (positiveFeedback, msg, callback) ->
