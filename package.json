@@ -1,0 +1,53 @@
+{
+  "name": "sphere-order-distribution",
+  "description": "Distributes your SPHERE.IO marketplace orders to the dedicated retailer.",
+  "version": "0.0.1",
+  "homepage": "https://github.com/hajoeichler/sphere-order-distribution",
+  "keywords": [ "sphere", "api" ],
+  "author": {
+    "name": "Hajo Eichler",
+    "email": "hajo.eichler@commercetools.de"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hajoeichler/sphere-order-distribution.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hajoeichler/sphere-order-distribution/issues"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/hajoeichler/sphere-order-distribution/blob/master/LICENSE-MIT"
+    }
+  ],
+  "main": "main.js",
+  "engines": {
+    "node": ">= 0.8.0"
+  },
+  "scripts": {
+    "test": "grunt coverage"
+  },
+  "dependencies": {
+    "node-logentries": "0.1.2",
+    "optimist": "0.6.0",
+    "progress": "~1.1.2",
+    "q": "~0.9.7",
+    "sphere-node-connect": "~0.2.0",
+    "sphere-node-sync": "~0.2.2",
+    "underscore": "~1.5.2"
+  },
+  "devDependencies": {
+    "coveralls": "~2.1.0",
+    "grunt": "~0.4.1",
+    "grunt-shell": "~0.5.0",
+    "grunt-coffeelint": "~0.0.7",
+    "grunt-contrib-clean": "~0.5.0",
+    "grunt-contrib-concat": "~0.3.0",
+    "grunt-contrib-coffee": "~0.7.0",
+    "grunt-contrib-watch": "~0.5.3",
+    "grunt-bump": "~0.0.11",
+    "istanbul": "~0.1.46",
+    "jasmine-node": "~1.11.0"
+  }
+}

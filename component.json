@@ -1,0 +1,33 @@
+{
+    "title": "sphere-order-distribution",
+    "description": "Syncronizes your SPHERE.IO orders from the marketplace master to the merchant's project.",
+    "url" : "http://www.commercetools.com",
+    "credentials": {
+        "fields": {
+            "projectKey": {
+                "viewClass": "TextFieldView",
+                "label": "Project Key",
+                "required": true,
+                "placeholder": "Paste your project key"
+            },
+            "clientId": {
+                "viewClass": "TextFieldView",
+                "label": "Client Id",
+                "required": true,
+                "placeholder": "Paste your client id"
+            },
+            "clientSecret": {
+                "viewClass": "TextFieldView",
+                "label": "Client Secret",
+                "required": true,
+                "placeholder": "Paste your client secret"
+            }
+        }
+    },
+    "actions": {
+        "services": {
+            "main": "elasticio.js",
+            "title": "Order Master -> Retailer Distribution",
+        }
+    }
+}

@@ -1,0 +1,14 @@
+language: node_js
+node_js:
+- '0.10'
+before_script:
+- npm install -g grunt-cli
+- ./create_config.sh
+after_success:
+- node lib/run.js --projectKey ${SPHERE_PROJECT_KEY} --clientId ${SPHERE_CLIENT_ID} --clientSecret ${SPHERE_CLIENT_SECRET}
+env:
+  global:
+  - secure: IO2AuiZ81ea/qG/txwpGEybc7uMwm9VOGHRO3bvngY6EA9CPLATHBEM/wAeLLhbX5sGXSmT047wOd6NUz8lLsLsjbo2FdS6ussRxdA5VA3bm+iINsj+s2d8ATiN8myQX2kEMphP2bI9JkN2UEDV0da/q1Uoc1d3J5Qq0yshm62A=
+  - secure: c3PAbz8QtbGMuakdjJ17u9vswxY6MnIJWFBmI7+iG/OUQleVtbb+raEF3GHIMRxrIcRKcG57v31f49gz6LZr2RgmLstjHltzEtUSi8aJtghusBAMVEACCnpe+lOgxfYgpkSShEVFWtwv4mt+Vq+XCH0T/lyg9+OK6f+6TrlKwjY=
+  - secure: O0YZqkf0fu2z4xeW2kszYYcimm4sHuxve3tV8VRq3i5+vOu5ASK9Yw6ZknzvFTEEuvHuR6rdip5EGWPKYW8yHUaVP3eHAbLiI4dpZmQoJdnNnHaWXVaNMtOhFf1BbKcLwikDy2UZ1w7o5ZR9rquaUfL5iU0xte9ddHhvQ/jLCLE=
+  - secure: WUU8XD/ozapmflJe34cpVs7//8aID9LwuZQEsYQpreNyAgZODkL1OOC6IiCSvffJumX4oxw0wfuGlSkD4HeZhuf6KsJYYrOUpFQf+u4GmPDoNesnMknIG476uhzOhH5QLe+A6m9QzGsjRrSBAv5vux2iju55a5qrnu4ulKdPBrs=
