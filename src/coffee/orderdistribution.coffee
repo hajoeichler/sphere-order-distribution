@@ -67,4 +67,20 @@ class OrderDistribution
         # TODO: Are there SKUs in custom line items?
     skus
 
+  replaceSKUs: (order, masterSKU2retailerSKU) ->
+    if order.lineItems
+      for li in order.lineItems
+        continue unless li.variant
+        continue unless li.variant.sku
+        masterSKU = li.variant.sku
+        retailerSKU = masterSKU2retailerSKU[masterSKU]
+        continue unless retailerSKU
+        li.variant.sku = retailerSKU
+        li.variant.attributes = [] unless li.variant.attributes
+        a =
+          name: 'mastersku'
+          value: masterSKU
+        li.variant.attributes.push a
+    order
+
 module.exports = OrderDistribution

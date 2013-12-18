@@ -36,3 +36,25 @@ describe '#extractSKUs', ->
     expect(skus.length).toBe 2
     expect(skus[0]).toBe 'mySKU1'
     expect(skus[1]).toBe 'mySKU2'
+
+describe '#replaceSKUs', ->
+  beforeEach ->
+    c =
+      project_key: 'x'
+      client_id: 'y'
+      client_secret: 'z'
+    @distribution = new OrderDistribution { config: c }
+
+  it 'should create masterSKU attribute with right value', ->
+    o =
+      lineItems: [
+        { variant:
+          sku: 'masterSKU1' }
+      ]
+    masterSKU2retailerSKU = []
+    masterSKU2retailerSKU.masterSKU1 = 'retailerSKUx'
+
+    e = @distribution.replaceSKUs o, masterSKU2retailerSKU
+    expect(e.lineItems[0].variant.sku).toBe 'retailerSKUx'
+    expect(e.lineItems[0].variant.attributes[0].name).toBe 'mastersku'
+    expect(e.lineItems[0].variant.attributes[0].value).toBe 'masterSKU1'
