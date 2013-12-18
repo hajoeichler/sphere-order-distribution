@@ -5,24 +5,23 @@ describe 'OrderDistribution', ->
     expect(-> new OrderDistribution()).toThrow new Error 'No configuration in options!'
     expect(-> new OrderDistribution({})).toThrow new Error 'No configuration in options!'
 
+createOD = () ->
+  c =
+    project_key: 'x'
+    client_id: 'y'
+    client_secret: 'z'
+  new OrderDistribution { config: c }
+
 describe '#run', ->
   beforeEach ->
-    c =
-      project_key: 'x'
-      client_id: 'y'
-      client_secret: 'z'
-    @distribution = new OrderDistribution { config: c }
+    @distribution = createOD()
 
   it 'should throw error if callback is passed', ->
     expect(=> @distribution.run()).toThrow new Error 'Callback must be a function!'
 
 describe '#extractSKUs', ->
   beforeEach ->
-    c =
-      project_key: 'x'
-      client_id: 'y'
-      client_secret: 'z'
-    @distribution = new OrderDistribution { config: c }
+    @distribution = createOD()
 
   it 'should extract line item skus', ->
     o =
@@ -39,11 +38,7 @@ describe '#extractSKUs', ->
 
 describe '#replaceSKUs', ->
   beforeEach ->
-    c =
-      project_key: 'x'
-      client_id: 'y'
-      client_secret: 'z'
-    @distribution = new OrderDistribution { config: c }
+    @distribution = createOD()
 
   it 'should create masterSKU attribute with right value', ->
     o =
