@@ -16,9 +16,10 @@ class OrderDistribution
     else
       @returnResult false, 'No data found in elastic.io msg!', cb
 
-  getOrders: (rest) ->
+  getUnexportedOrders: (rest) ->
     deferred = Q.defer()
-    rest.GET "/orders?limit=0", (error, response, body) ->
+    query = encode "exportInfo.size = 0"
+    rest.GET "/orders?limit=0?where=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching orders: " + error
       else if response.statusCode != 200
@@ -31,7 +32,6 @@ class OrderDistribution
   run: (masterOrders, callback) ->
     throw new Error 'Callback must be a function!' unless _.isFunction callback
     # workflow:
-    # find orders that have an empty export array
     # filter orders that do not fit the retailer channel key
     # each order
     #   get all SKUs from lineitems
@@ -53,5 +53,18 @@ class OrderDistribution
       logLevel = if positiveFeedback then 'info' else 'err'
       @log.log logLevel, d
     callback d
+
+  extractSKUs: (order) ->
+    skus = []
+    if order.lineItems
+      for li in order.lineItems
+        continue unless li.variant
+        continue unless li.variant.sku
+        skus.push li.variant.sku
+    if order.customLineItems
+      for cli in order.customLineItems
+        continue
+        # TODO: Are there SKUs in custom line items?
+    skus
 
 module.exports = OrderDistribution
