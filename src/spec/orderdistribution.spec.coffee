@@ -40,6 +40,18 @@ describe '#replaceSKUs', ->
   beforeEach ->
     @distribution = createOD()
 
+  it 'should switch variant SKU', ->
+    o =
+      lineItems: [
+        { variant:
+          sku: 'mSKU' }
+      ]
+    m2r = []
+    m2r.mSKU = 'oSKU'
+
+    e = @distribution.replaceSKUs o, m2r
+    expect(e.lineItems[0].variant.sku).toBe 'oSKU'
+
   it 'should create masterSKU attribute with right value', ->
     o =
       lineItems: [
@@ -50,7 +62,6 @@ describe '#replaceSKUs', ->
     masterSKU2retailerSKU.masterSKU1 = 'retailerSKUx'
 
     e = @distribution.replaceSKUs o, masterSKU2retailerSKU
-    expect(e.lineItems[0].variant.sku).toBe 'retailerSKUx'
     expect(e.lineItems[0].variant.attributes[0].name).toBe 'mastersku'
     expect(e.lineItems[0].variant.attributes[0].value).toBe 'masterSKU1'
 
@@ -68,7 +79,7 @@ describe '#removeChannels  ', ->
     e = @distribution.removeChannels o
     expect(e.lineItems.channel).toBeUndefined
 
-  it 'should remove variant prices channels', ->
+  it 'should remove channels from variant prices', ->
     o =
       lineItems: [
         { variant: { prices: [] } }
