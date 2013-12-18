@@ -65,7 +65,7 @@ describe '#replaceSKUs', ->
     expect(e.lineItems[0].variant.attributes[0].name).toBe 'mastersku'
     expect(e.lineItems[0].variant.attributes[0].value).toBe 'masterSKU1'
 
-describe '#removeChannels  ', ->
+describe '#removeChannels', ->
   beforeEach ->
     @distribution = createOD()
 
@@ -92,3 +92,42 @@ describe '#removeChannels  ', ->
 
     e = @distribution.removeChannels o
     expect(e.lineItems.channel).toBeUndefined
+
+describe '#getUnexportedOrders', ->
+  beforeEach ->
+    @distribution = createOD()
+
+  it 'should query orders without epxortInfo', (done) ->
+    spyOn(@distribution.rest, "GET").andCallFake((path, callback) ->
+      callback(null, {statusCode: 200}, '{ "results": [] }'))
+
+    @distribution.getUnexportedOrders(@distribution.rest).then () =>
+      expect(@distribution.rest.GET).toHaveBeenCalledWith("/orders?limit=0&where=exportInfo%20is%20empty", jasmine.any(Function))
+      done()
+    .fail (msg) ->
+      console.log "2msg: " + msg
+      expect(true).toBe false
+
+describe '#addExportInfo', ->
+  beforeEach ->
+    @distribution = createOD()
+
+  it 'should post export info', (done) ->
+    spyOn(@distribution.rest, "POST").andCallFake((path, payload, callback) ->
+      callback(null, {statusCode: 200}, null))
+
+    @distribution.addExportInfo('x', 1, 'y', 'z').then () =>
+      expectedAction =
+        version: 1
+        actions: [
+          action: 'updateExportInfo'
+          channel:
+            typeId: 'channel'
+            id: 'y'
+          externalId: 'z'
+        ]
+      expect(@distribution.rest.POST).toHaveBeenCalledWith("/orders/x", JSON.stringify(expectedAction), jasmine.any(Function))
+      done()
+    .fail (msg) ->
+      console.log "1msg: " + msg
+      expect(true).toBe false

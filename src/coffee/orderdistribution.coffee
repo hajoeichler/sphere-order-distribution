@@ -7,6 +7,7 @@ Q = require 'q'
 class OrderDistribution
   constructor: (@options) ->
     throw new Error 'No configuration in options!' if not @options or not @options.config
+    @rest = new Rest config: @options.config
     @log = logentries.logger token: @options.logentries.token if @options.logentries
 
   elasticio: (msg, cfg, cb, snapshot) ->
@@ -18,8 +19,8 @@ class OrderDistribution
 
   getUnexportedOrders: (rest) ->
     deferred = Q.defer()
-    query = encode "exportInfo.size = 0"
-    rest.GET "/orders?limit=0?where=#{query}", (error, response, body) ->
+    query = encodeURIComponent "exportInfo is empty"
+    rest.GET "/orders?limit=0&where=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching orders: " + error
       else if response.statusCode != 200
@@ -41,6 +42,27 @@ class OrderDistribution
     #   import order into retailer and get order id
     #   add export info to corresponding order in master
     @returnResult true, 'Nothing to do.', callback
+
+  addExportInfo: (orderId, orderVersion, retailerId, retailerOrderId) ->
+    deferred = Q.defer()
+    data =
+      version: orderVersion
+      actions: [
+        action: 'updateExportInfo'
+        channel:
+          typeId: 'channel'
+          id: retailerId
+        externalId: retailerOrderId
+      ]
+    @rest.POST "/orders/#{orderId}", JSON.stringify(data), (error, response, body) ->
+      if error
+        deferred.reject "Error on setting export info: " + error
+      else if response.statusCode != 200
+        deferred.reject "Problem on setting export info (status: #{response.statusCode}): " + body
+      else
+        res = JSON.parse(body)
+        deferred.resolve res
+    deferred.promise
 
   returnResult: (positiveFeedback, msg, callback) ->
     if @options.showProgress
