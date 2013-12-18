@@ -53,3 +53,31 @@ describe '#replaceSKUs', ->
     expect(e.lineItems[0].variant.sku).toBe 'retailerSKUx'
     expect(e.lineItems[0].variant.attributes[0].name).toBe 'mastersku'
     expect(e.lineItems[0].variant.attributes[0].value).toBe 'masterSKU1'
+
+describe '#removeChannels  ', ->
+  beforeEach ->
+    @distribution = createOD()
+
+  it 'should remove line item channels', ->
+    o =
+      lineItems: [
+        { channel:
+          key: 'retailer1' }
+      ]
+
+    e = @distribution.removeChannels o
+    expect(e.lineItems.channel).toBeUndefined
+
+  it 'should remove variant prices channels', ->
+    o =
+      lineItems: [
+        { variant: { prices: [] } }
+      ]
+    p =
+      country: 'DE'
+      channel:
+        key: 'retailerX'
+    o.lineItems[0].variant.prices.push p
+
+    e = @distribution.removeChannels o
+    expect(e.lineItems.channel).toBeUndefined

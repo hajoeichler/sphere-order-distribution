@@ -83,4 +83,16 @@ class OrderDistribution
         li.variant.attributes.push a
     order
 
+  removeChannels: (order) ->
+    if order.lineItems
+      for li in order.lineItems
+        if li.channel
+          delete li.channel
+        continue unless li.variant
+        continue unless li.variant.prices
+        for p in li.variant.prices
+          if p.channel
+            delete p.channel
+    order
+
 module.exports = OrderDistribution
