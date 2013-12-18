@@ -61,10 +61,6 @@ class OrderDistribution
         continue unless li.variant
         continue unless li.variant.sku
         skus.push li.variant.sku
-    if order.customLineItems
-      for cli in order.customLineItems
-        continue
-        # TODO: Are there SKUs in custom line items?
     skus
 
   replaceSKUs: (order, masterSKU2retailerSKU) ->
