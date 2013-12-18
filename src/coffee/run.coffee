@@ -14,10 +14,10 @@ options =
     client_id: argv.clientId
     client_secret: argv.clientSecret
 
-updater = new OrderDistribution Config
+impl = new OrderDistribution Config
 rest = new Rest options
-updater.getOrders(rest).then (orders) ->
-  updater.run orders, (msg) ->
+impl.getOrders(rest).then (orders) ->
+  impl.run orders, (msg) ->
     console.log msg
 .fail (msg) ->
   console.log msg
