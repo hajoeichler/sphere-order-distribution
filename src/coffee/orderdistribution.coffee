@@ -22,6 +22,7 @@ class OrderDistribution
     date = new Date()
     offsetInDays = 7 unless offsetInDays
     date.setDate(date.getDate() - offsetInDays)
+    # TODO: filter orders according to channel
     d = "#{date.toISOString().substring(0,11)}00:00:00.000Z"
     query = encodeURIComponent "createdAt > \"#{d}\""
     rest.GET "/orders?where=#{query}", (error, response, body) ->
@@ -51,29 +52,31 @@ class OrderDistribution
 
   run: (masterOrders, callback) ->
     throw new Error 'Callback must be a function!' unless _.isFunction callback
+    if _.size(masterOrders) is 0
+      @returnResult true, 'Nothing to do.', callback
+      return
     if @options.showProgress
       @bar = new ProgressBar 'Distributing orders [:bar] :percent done', { width: 50, total: _.size(masterOrders) }
-#    for o in masterOrders
-#      unless validateSameChannel o
-#        @log.alert("TODO")
-#      skus = extractSKUs o
-#      gets = []
-#      for s in sku
-#        getRetailerProductByMasterSKU(s)
-#      Q.all(gets).then (retailerProducts) ->#
-
-#      .fail (msg) ->
-#        @returnResult false, msg, callback
-    # workflow:
-    # filter orders that do not fit the retailer channel key
-    # each order
-    #   get all SKUs from lineitems
-    #   get all products for the SKUs (in attribute masterSKU) from retailer project
-    #   exchange all SKUs in oder
-    #   remove channel information in order
-    #   import order into retailer and get order id
-    #   add export info to corresponding order in master
-    @returnResult true, 'Nothing to do.', callback
+    for order in masterOrders
+      unless validateSameChannel order
+        @log.alert("TODO")
+        continue
+      masterSKUs = extractSKUs order
+      gets = []
+      for s in masterSKUs
+        getRetailerProductByMasterSKU(s)
+      Q.all(gets).then (retailerProducts) ->
+        masterSKU2retailerSKU = matchSKUs(retailerProducts, masterSKUs)
+        unless ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
+          @log.alert("TODO")
+        retailerOrder = replaceSKUs(order)
+        retailerOrder = removeChannels(retailerOrder)
+        # TODO:
+        # - import order into retailer and get order id
+        # - add export info to corresponding order in master
+        @returnResult true, 'Nothing to do.', callback
+      .fail (msg) ->
+        @returnResult false, msg, callback
 
   matchSKUs: (products) ->
     masterSKU2retailerSKU = {}
@@ -91,6 +94,10 @@ class OrderDistribution
       ret[a.value] = variant.sku
       break
     return ret
+
+  ensureAllSKUs: (masterSKUs, masterSKU2retailerSKU) ->
+    difference = _.filter masterSKUs, (sku) ->
+      sku unless masterSKU2retailerSKU[sku]
 
   addExportInfo: (orderId, orderVersion, retailerId, retailerOrderId) ->
     deferred = Q.defer()

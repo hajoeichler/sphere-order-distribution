@@ -95,6 +95,28 @@ describe '#matchSKUs', ->
     expect(m2r.m1).toBe 'retV2'
     expect(m2r.m2).toBe 'retV1'
 
+describe '#ensureAllSKUs', ->
+  beforeEach ->
+    @distribution = createOD()
+
+  it 'should return true for empty inputs', ->
+    m2r = {}
+    skus = []
+    expect(@distribution.ensureAllSKUs(m2r, skus))
+
+  it 'should return true if all SKUs are matched', ->
+    m2r =
+      123: 234
+    skus = [ '123' ]
+    expect(@distribution.ensureAllSKUs(m2r, skus))
+
+  it 'should return false if not all SKUs are in the match', ->
+    m2r =
+      123: 234
+    skus = [ '123', 'foo' ]
+    expect(@distribution.ensureAllSKUs(m2r, skus))
+
+
 describe '#replaceSKUs', ->
   beforeEach ->
     @distribution = createOD()
