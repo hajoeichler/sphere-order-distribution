@@ -20,5 +20,5 @@ impl.getUnexportedOrders(rest).then (orders) ->
   impl.run orders, (msg) ->
     console.log msg
 .fail (msg) ->
-  process.exit 1
   console.log msg
+  process.exit 1
