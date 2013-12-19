@@ -64,6 +64,14 @@ class OrderDistribution
     #   add export info to corresponding order in master
     @returnResult true, 'Nothing to do.', callback
 
+  matchSKUs: (products, masterSKUs) ->
+    masterSKU2retailerSKU = {}
+    for product in products
+      for a in product.masterVariant.attributes
+        continue unless a.name is 'mastersku'
+        masterSKU2retailerSKU[a.value] = product.masterVariant.sku
+    masterSKU2retailerSKU
+
   addExportInfo: (orderId, orderVersion, retailerId, retailerOrderId) ->
     deferred = Q.defer()
     data =

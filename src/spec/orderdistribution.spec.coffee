@@ -68,6 +68,21 @@ describe '#extractSKUs', ->
     expect(skus[0]).toBe 'mySKU1'
     expect(skus[1]).toBe 'mySKU2'
 
+describe '#matchSKUs', ->
+  beforeEach ->
+    @distribution = createOD()
+
+  it 'should establish matching table', ->
+    p =
+      masterVariant:
+        sku: 'ret1'
+        attributes: [
+          { name: 'mastersku', value: 'master1' }
+        ]
+    mSKUs = [ 'master1' ]
+    m2r = @distribution.matchSKUs([p], mSKUs)
+    expect(_.size(m2r)).toBe _.size(mSKUs)
+
 describe '#replaceSKUs', ->
   beforeEach ->
     @distribution = createOD()
