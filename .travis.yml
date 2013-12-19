@@ -8,7 +8,6 @@ after_success:
 - node lib/run.js --projectKey ${SPHERE_PROJECT_KEY} --clientId ${SPHERE_CLIENT_ID} --clientSecret ${SPHERE_CLIENT_SECRET}
 env:
   global:
-  - secure: IO2AuiZ81ea/qG/txwpGEybc7uMwm9VOGHRO3bvngY6EA9CPLATHBEM/wAeLLhbX5sGXSmT047wOd6NUz8lLsLsjbo2FdS6ussRxdA5VA3bm+iINsj+s2d8ATiN8myQX2kEMphP2bI9JkN2UEDV0da/q1Uoc1d3J5Qq0yshm62A=
-  - secure: c3PAbz8QtbGMuakdjJ17u9vswxY6MnIJWFBmI7+iG/OUQleVtbb+raEF3GHIMRxrIcRKcG57v31f49gz6LZr2RgmLstjHltzEtUSi8aJtghusBAMVEACCnpe+lOgxfYgpkSShEVFWtwv4mt+Vq+XCH0T/lyg9+OK6f+6TrlKwjY=
-  - secure: O0YZqkf0fu2z4xeW2kszYYcimm4sHuxve3tV8VRq3i5+vOu5ASK9Yw6ZknzvFTEEuvHuR6rdip5EGWPKYW8yHUaVP3eHAbLiI4dpZmQoJdnNnHaWXVaNMtOhFf1BbKcLwikDy2UZ1w7o5ZR9rquaUfL5iU0xte9ddHhvQ/jLCLE=
-  - secure: WUU8XD/ozapmflJe34cpVs7//8aID9LwuZQEsYQpreNyAgZODkL1OOC6IiCSvffJumX4oxw0wfuGlSkD4HeZhuf6KsJYYrOUpFQf+u4GmPDoNesnMknIG476uhzOhH5QLe+A6m9QzGsjRrSBAv5vux2iju55a5qrnu4ulKdPBrs=
+  - secure: UlCxfamCW8+iT2/lAfficJqOHPXDTCtvSDcVkrA4PkWdMMKFSNq3K8WGr4mwD9rJX4RvBC0+52vKa3JbpZeW3z+QqzrPZgrhW1H5nZeI75nGcvUL0wm77uUT0rO/cW4u4Zt+Y3VqHSvnEbaUIUK3hePVwR44AHev5OroaovEnzo=
+  - secure: pYTH7TjK9FGPMJIVzmAKIevtlrAasny3WyzASlxsqgbCsIs2sP0ISri2XdgTlJVOArO4xB+EW4hyOr7yv+dSRr2ArffL06u/s9kv3y0NDKwTk9NBWK5a5FM69yfU8Sy/oi1hcynF3R7ndy05H1fasDJrmWO0ZGBkb8l8gk/yKqw=
+  - secure: Xke2BDxR4DGyYGQFhKsBWrIbQRFvrW/fnQMVyMHVK1ajJAFEvBeNtIJEGeUgdWG4sUgSXqDZRfYQaA7nVDk3YEOQcavr+J2zaYvfNDCpZH55RLFvJdj1kDEoisXQ/NjOpPbKWV7gosttBBudi7vq+CUyfPDimg9fTnlclxZn+sg=
