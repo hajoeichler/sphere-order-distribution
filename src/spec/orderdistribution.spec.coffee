@@ -187,12 +187,16 @@ describe '#getUnexportedOrders', ->
         ]
       callback(null, {statusCode: 200}, JSON.stringify(body)))
 
-    @distribution.getUnexportedOrders(@distribution.rest).then (orders) =>
+    @distribution.getUnexportedOrders(@distribution.rest, "123").then (orders) =>
       expect(_.size(orders)).toBe 1
-      expect(@distribution.rest.GET).toHaveBeenCalledWith("/orders?where=createdAt%20%3E%20%222013-12-12T00%3A00%3A00.000Z%22", jasmine.any(Function))
+      expectedURI = '/orders?where='
+      expectedURI += encodeURIComponent 'createdAt > "2013-12-12T00:00:00.000Z"'
+      expectedURI += encodeURIComponent ' and lineItems(channel(id="123")) and not exportInfo(channel(id="123"))'
+      expect(@distribution.rest.GET).toHaveBeenCalledWith(expectedURI, jasmine.any(Function))
       done()
     .fail (msg) ->
       expect(true).toBe false
+      done()
 
 describe '#getRetailerProductByMasterSKU', ->
   beforeEach ->
@@ -208,6 +212,24 @@ describe '#getRetailerProductByMasterSKU', ->
       done()
     .fail (msg) ->
       expect(true).toBe false
+      done()
+
+describe '#getChannelIdByKey', ->
+  beforeEach ->
+    @distribution = createOD()
+
+  it 'should query for channel by key', (done) ->
+    spyOn(@distribution.rest, "GET").andCallFake((path, callback) ->
+      callback(null, {statusCode: 200}, '{ "results": [{ "id": "channel123" }] }'))
+
+    @distribution.getChannelIdByKey(@distribution.rest, 'bar').then (channelId) =>
+      uri = '/channels?where=key%3D%22bar%22'
+      expect(@distribution.rest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
+      expect(channelId).toBe 'channel123'
+      done()
+    .fail (msg) ->
+      expect(true).toBe false
+      done()
 
 describe '#addExportInfo', ->
   beforeEach ->
@@ -231,3 +253,4 @@ describe '#addExportInfo', ->
       done()
     .fail (msg) ->
       expect(true).toBe false
+      done()

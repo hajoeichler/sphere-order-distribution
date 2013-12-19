@@ -17,14 +17,29 @@ class OrderDistribution
     else
       @returnResult false, 'No data found in elastic.io msg!', cb
 
-  getUnexportedOrders: (rest, offsetInDays) ->
+  getChannelIdByKey: (rest, channelKey) ->
+    deferred = Q.defer()
+    query = encodeURIComponent "key=\"#{channelKey}\""
+    rest.GET "/channels?where=#{query}", (error, response, body) ->
+      if error
+        deferred.reject "Error on fetching channel: " + error
+      else if response.statusCode != 200
+        deferred.reject "Problem on fetching channel (status: #{response.statusCode}): " + body
+      else
+        channels = JSON.parse(body).results
+        if _.size(channels) is 1
+          deferred.resolve channels[0].id
+        else
+          deferred.reject "Unexpected number of channels found: #{_.size(channels)}!"
+    deferred.promise
+
+  getUnexportedOrders: (rest, retailerChannelId, offsetInDays) ->
     deferred = Q.defer()
     date = new Date()
     offsetInDays = 7 unless offsetInDays
     date.setDate(date.getDate() - offsetInDays)
-    # TODO: filter orders according to channel
     d = "#{date.toISOString().substring(0,11)}00:00:00.000Z"
-    query = encodeURIComponent "createdAt > \"#{d}\""
+    query = encodeURIComponent "createdAt > \"#{d}\" and lineItems(channel(id=\"#{retailerChannelId}\")) and not exportInfo(channel(id=\"#{retailerChannelId}\"))"
     rest.GET "/orders?where=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching orders: " + error
@@ -58,19 +73,19 @@ class OrderDistribution
     if @options.showProgress
       @bar = new ProgressBar 'Distributing orders [:bar] :percent done', { width: 50, total: _.size(masterOrders) }
     for order in masterOrders
-      unless validateSameChannel order
+      unless @validateSameChannel order
         @log.alert("TODO")
         continue
-      masterSKUs = extractSKUs order
+      masterSKUs = @extractSKUs order
       gets = []
       for s in masterSKUs
-        getRetailerProductByMasterSKU(s)
+        @getRetailerProductByMasterSKU(s)
       Q.all(gets).then (retailerProducts) ->
-        masterSKU2retailerSKU = matchSKUs(retailerProducts, masterSKUs)
-        unless ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
+        masterSKU2retailerSKU = @matchSKUs(retailerProducts, masterSKUs)
+        unless @ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
           @log.alert("TODO")
-        retailerOrder = replaceSKUs(order)
-        retailerOrder = removeChannels(retailerOrder)
+        retailerOrder = @replaceSKUs(order)
+        retailerOrder = @removeChannels(retailerOrder)
         # TODO:
         # - import order into retailer and get order id
         # - add export info to corresponding order in master
