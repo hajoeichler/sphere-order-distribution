@@ -187,7 +187,7 @@ describe '#getUnexportedOrders', ->
         ]
       callback(null, {statusCode: 200}, JSON.stringify(body)))
 
-    @distribution.getUnexportedOrders(@distribution.rest, "123").then (orders) =>
+    @distribution.getUnexportedOrders(@distribution.rest).then (orders) =>
       expect(_.size(orders)).toBe 1
       expectedURI = '/orders?limit=0&where='
       expectedURI += encodeURIComponent 'createdAt > "2013-12-12T00:00:00.000Z"'

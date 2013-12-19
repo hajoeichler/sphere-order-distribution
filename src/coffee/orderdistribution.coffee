@@ -33,7 +33,7 @@ class OrderDistribution
           deferred.reject "Unexpected number of channels found: #{_.size(channels)}!"
     deferred.promise
 
-  getUnexportedOrders: (rest, retailerChannelId, offsetInDays) ->
+  getUnexportedOrders: (rest, offsetInDays) ->
     deferred = Q.defer()
     date = new Date()
     offsetInDays = 7 unless offsetInDays
