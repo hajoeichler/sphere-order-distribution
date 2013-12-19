@@ -1,3 +1,4 @@
+_ = require('underscore')._
 OrderDistribution = require('../main').OrderDistribution
 
 describe 'OrderDistribution', ->
@@ -130,13 +131,18 @@ describe '#getUnexportedOrders', ->
 
   it 'should query orders without epxortInfo', (done) ->
     spyOn(@distribution.rest, "GET").andCallFake((path, callback) ->
-      callback(null, {statusCode: 200}, '{ "results": [] }'))
+      body =
+        results: [
+          { exportInfo: [] }
+          { exportInfo: [ {} ] }
+        ]
+      callback(null, {statusCode: 200}, JSON.stringify(body)))
 
-    @distribution.getUnexportedOrders(@distribution.rest).then () =>
-      expect(@distribution.rest.GET).toHaveBeenCalledWith("/orders?limit=0&where=exportInfo%20is%20empty", jasmine.any(Function))
+    @distribution.getUnexportedOrders(@distribution.rest).then (orders) =>
+      expect(_.size(orders)).toBe 1
+      expect(@distribution.rest.GET).toHaveBeenCalledWith("/orders?where=createdAt%20%3E%20%222013-12-12T00%3A00%3A00.000Z%22", jasmine.any(Function))
       done()
     .fail (msg) ->
-      console.log "2msg: " + msg
       expect(true).toBe false
 
 describe '#getRetailerProductByMasterSKU', ->

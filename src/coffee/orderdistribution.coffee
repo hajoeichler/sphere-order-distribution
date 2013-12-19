@@ -17,17 +17,23 @@ class OrderDistribution
     else
       @returnResult false, 'No data found in elastic.io msg!', cb
 
-  getUnexportedOrders: (rest) ->
+  getUnexportedOrders: (rest, offsetInDays) ->
     deferred = Q.defer()
-    query = encodeURIComponent "exportInfo is empty"
-    rest.GET "/orders?limit=0&where=#{query}", (error, response, body) ->
+    date = new Date()
+    offsetInDays = 7 unless offsetInDays
+    date.setDate(date.getDate() - offsetInDays)
+    d = "#{date.toISOString().substring(0,11)}00:00:00.000Z"
+    query = encodeURIComponent "createdAt > \"#{d}\""
+    rest.GET "/orders?where=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching orders: " + error
       else if response.statusCode != 200
         deferred.reject "Problem on fetching orders (status: #{response.statusCode}): " + body
       else
         orders = JSON.parse(body).results
-        deferred.resolve orders
+        unexportedOrders = _.filter orders, (o) ->
+          _.size(o.exportInfo) > 0
+        deferred.resolve unexportedOrders
     deferred.promise
 
   getRetailerProductByMasterSKU: (sku) ->
