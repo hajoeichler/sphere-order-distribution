@@ -89,6 +89,24 @@ class OrderDistribution
       @log.log logLevel, d
     callback d
 
+  validateSameChannel: (order) ->
+    channelID = null
+    checkChannelId = (channel) ->
+      if channelID is null
+        channelID = channel.id
+        return true
+      return channelID is channel.id
+    if order.lineItems
+      for li in order.lineItems
+        if li.channel
+          return false unless checkChannelId li.channel
+        continue unless li.variant
+        continue unless li.variant.prices
+        for p in li.variant.prices
+          if p.channel
+            return false unless checkChannelId p.channel
+    true
+
   extractSKUs: (order) ->
     skus = []
     if order.lineItems

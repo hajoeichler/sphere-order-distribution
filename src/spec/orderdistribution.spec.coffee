@@ -19,6 +19,37 @@ describe '#run', ->
   it 'should throw error if callback is passed', ->
     expect(=> @distribution.run()).toThrow new Error 'Callback must be a function!'
 
+describe '#validateSameChannel', ->
+  beforeEach ->
+    @distribution = createOD()
+
+  it 'should be true for one channel', ->
+    o =
+      lineItems: [
+        { channel:
+          key: 'retailer1' }
+      ]
+    expect(@distribution.validateSameChannel(o)).toBe true
+
+
+  it 'should be true for same channel', ->
+    o =
+      lineItems: [
+        channel: { id: 'retailer1' }
+        variant:
+          prices: [ { channel: { id: 'retailer1' } } ]
+      ]
+    expect(@distribution.validateSameChannel(o)).toBe true
+
+  it 'should be false for different channels', ->
+    o =
+      lineItems: [
+        channel: { id: 'retailer1' }
+        variant:
+          prices: [ { channel: id: 'someOther' } ]
+      ]
+    expect(@distribution.validateSameChannel(o)).toBe false
+
 describe '#extractSKUs', ->
   beforeEach ->
     @distribution = createOD()
