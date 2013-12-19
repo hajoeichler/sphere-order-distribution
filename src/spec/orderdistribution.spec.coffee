@@ -72,16 +72,28 @@ describe '#matchSKUs', ->
   beforeEach ->
     @distribution = createOD()
 
-  it 'should establish matching table', ->
+  it 'should matching masterVariant', ->
     p =
       masterVariant:
         sku: 'ret1'
         attributes: [
           { name: 'mastersku', value: 'master1' }
         ]
-    mSKUs = [ 'master1' ]
-    m2r = @distribution.matchSKUs([p], mSKUs)
-    expect(_.size(m2r)).toBe _.size(mSKUs)
+    m2r = @distribution.matchSKUs([p])
+    expect(_.size(m2r)).toBe 1
+    expect(m2r.master1).toBe 'ret1'
+
+  it 'should matching variant', ->
+    p =
+      masterVariant: { attributes: [] }
+      variants: [
+        { sku: 'retV1', attributes: [ { name: 'mastersku', value: 'm2' } ] }
+        { sku: 'retV2', attributes: [ { name: 'mastersku', value: 'm1' } ] }
+      ]
+    m2r = @distribution.matchSKUs([p])
+    expect(_.size(m2r)).toBe 2
+    expect(m2r.m1).toBe 'retV2'
+    expect(m2r.m2).toBe 'retV1'
 
 describe '#replaceSKUs', ->
   beforeEach ->

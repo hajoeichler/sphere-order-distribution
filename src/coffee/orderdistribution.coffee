@@ -53,6 +53,17 @@ class OrderDistribution
     throw new Error 'Callback must be a function!' unless _.isFunction callback
     if @options.showProgress
       @bar = new ProgressBar 'Distributing orders [:bar] :percent done', { width: 50, total: _.size(masterOrders) }
+#    for o in masterOrders
+#      unless validateSameChannel o
+#        @log.alert("TODO")
+#      skus = extractSKUs o
+#      gets = []
+#      for s in sku
+#        getRetailerProductByMasterSKU(s)
+#      Q.all(gets).then (retailerProducts) ->#
+
+#      .fail (msg) ->
+#        @returnResult false, msg, callback
     # workflow:
     # filter orders that do not fit the retailer channel key
     # each order
@@ -64,13 +75,22 @@ class OrderDistribution
     #   add export info to corresponding order in master
     @returnResult true, 'Nothing to do.', callback
 
-  matchSKUs: (products, masterSKUs) ->
+  matchSKUs: (products) ->
     masterSKU2retailerSKU = {}
     for product in products
-      for a in product.masterVariant.attributes
-        continue unless a.name is 'mastersku'
-        masterSKU2retailerSKU[a.value] = product.masterVariant.sku
+      _.extend masterSKU2retailerSKU, @matchVariantSKU(product.masterVariant)
+      continue unless product.variants
+      for v in product.variants
+        _.extend masterSKU2retailerSKU, @matchVariantSKU(v)
     masterSKU2retailerSKU
+
+  matchVariantSKU: (variant) ->
+    ret = {}
+    for a in variant.attributes
+      continue unless a.name is 'mastersku'
+      ret[a.value] = variant.sku
+      break
+    return ret
 
   addExportInfo: (orderId, orderVersion, retailerId, retailerOrderId) ->
     deferred = Q.defer()
