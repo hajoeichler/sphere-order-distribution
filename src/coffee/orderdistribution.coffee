@@ -51,6 +51,8 @@ class OrderDistribution
 
   run: (masterOrders, callback) ->
     throw new Error 'Callback must be a function!' unless _.isFunction callback
+    if @options.showProgress
+      @bar = new ProgressBar 'Distributing orders [:bar] :percent done', { width: 50, total: _.size(masterOrders) }
     # workflow:
     # filter orders that do not fit the retailer channel key
     # each order
