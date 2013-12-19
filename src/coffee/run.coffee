@@ -16,8 +16,9 @@ options =
 
 impl = new OrderDistribution Config
 rest = new Rest options
-impl.getOrders(rest).then (orders) ->
+impl.getUnexportedOrders(rest).then (orders) ->
   impl.run orders, (msg) ->
     console.log msg
 .fail (msg) ->
+  process.exit 1
   console.log msg
