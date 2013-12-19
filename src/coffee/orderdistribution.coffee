@@ -32,6 +32,9 @@ class OrderDistribution
 
   getRetailerProductsByMasterSKU: (skus) ->
     deferred = Q.defer()
+    if _.size(skus) is 0
+      deferred.resolve []
+      return deferred.promise
     queryString = ""
     for s,i in skus
       if i > 0

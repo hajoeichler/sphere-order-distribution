@@ -112,6 +112,9 @@ describe '#getRetailerProductsByMasterSKU', ->
   beforeEach ->
     @distribution = createOD()
 
+  it 'should return an empty array if no skus provided', ->
+    expect(@distribution.getRetailerProductsByMasterSKU([]).inspect().value).toEqual []
+
   it 'should query for products with several skus', (done) ->
     spyOn(@distribution.rest, "GET").andCallFake((path, callback) ->
       callback(null, {statusCode: 200}, '{ "results": [] }'))
