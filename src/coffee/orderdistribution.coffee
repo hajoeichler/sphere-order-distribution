@@ -30,6 +30,24 @@ class OrderDistribution
         deferred.resolve orders
     deferred.promise
 
+  getRetailerProductsByMasterSKU: (skus) ->
+    deferred = Q.defer()
+    queryString = ""
+    for s,i in skus
+      if i > 0
+        queryString += " or "
+      queryString += "variant.sku=\"#{s}\""
+    query = encodeURIComponent queryString
+    @rest.GET "/product-projection?limit=0&where=#{query}", (error, response, body) ->
+      if error
+        deferred.reject "Error on fetching products: " + error
+      else if response.statusCode != 200
+        deferred.reject "Problem on fetching products (status: #{response.statusCode}): " + body
+      else
+        orders = JSON.parse(body).results
+        deferred.resolve orders
+    deferred.promise
+
   run: (masterOrders, callback) ->
     throw new Error 'Callback must be a function!' unless _.isFunction callback
     # workflow:

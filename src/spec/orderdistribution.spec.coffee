@@ -108,6 +108,22 @@ describe '#getUnexportedOrders', ->
       console.log "2msg: " + msg
       expect(true).toBe false
 
+describe '#getRetailerProductsByMasterSKU', ->
+  beforeEach ->
+    @distribution = createOD()
+
+  it 'should query for products with several skus', (done) ->
+    spyOn(@distribution.rest, "GET").andCallFake((path, callback) ->
+      callback(null, {statusCode: 200}, '{ "results": [] }'))
+
+    @distribution.getRetailerProductsByMasterSKU(['foo', 'bar']).then () =>
+      uri = "/product-projection?limit=0&where="
+      uri += 'variant.sku%3D%22foo%22%20or%20variant.sku%3D%22bar%22'
+      expect(@distribution.rest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
+      done()
+    .fail (msg) ->
+      expect(true).toBe false
+
 describe '#addExportInfo', ->
   beforeEach ->
     @distribution = createOD()
@@ -129,5 +145,4 @@ describe '#addExportInfo', ->
       expect(@distribution.rest.POST).toHaveBeenCalledWith("/orders/x", JSON.stringify(expectedAction), jasmine.any(Function))
       done()
     .fail (msg) ->
-      console.log "1msg: " + msg
       expect(true).toBe false
