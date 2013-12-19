@@ -39,8 +39,8 @@ class OrderDistribution
     offsetInDays = 7 unless offsetInDays
     date.setDate(date.getDate() - offsetInDays)
     d = "#{date.toISOString().substring(0,11)}00:00:00.000Z"
-    query = encodeURIComponent "createdAt > \"#{d}\" and lineItems(channel(id=\"#{retailerChannelId}\")) and not exportInfo(channel(id=\"#{retailerChannelId}\"))"
-    rest.GET "/orders?where=#{query}", (error, response, body) ->
+    query = encodeURIComponent "createdAt > \"#{d}\""
+    rest.GET "/orders?limit=0&where=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching orders: " + error
       else if response.statusCode != 200
@@ -136,7 +136,7 @@ class OrderDistribution
     deferred.promise
 
   returnResult: (positiveFeedback, msg, callback) ->
-    if @options.showProgress
+    if @options.showProgress and @bar
       @bar.terminate()
     d =
       component: this.constructor.name
