@@ -108,20 +108,16 @@ describe '#getUnexportedOrders', ->
       console.log "2msg: " + msg
       expect(true).toBe false
 
-describe '#getRetailerProductsByMasterSKU', ->
+describe '#getRetailerProductByMasterSKU', ->
   beforeEach ->
     @distribution = createOD()
-
-  it 'should return an empty array if no skus provided', ->
-    expect(@distribution.getRetailerProductsByMasterSKU([]).inspect().value).toEqual []
 
   it 'should query for products with several skus', (done) ->
     spyOn(@distribution.rest, "GET").andCallFake((path, callback) ->
       callback(null, {statusCode: 200}, '{ "results": [] }'))
 
-    @distribution.getRetailerProductsByMasterSKU(['foo', 'bar']).then () =>
-      uri = "/product-projection?limit=0&where="
-      uri += 'variant.sku%3D%22foo%22%20or%20variant.sku%3D%22bar%22'
+    @distribution.getRetailerProductByMasterSKU('foo').then () =>
+      uri = "/product-projections/search?filter=variant.attributes.mastersku%3D%22foo%22"
       expect(@distribution.rest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
       done()
     .fail (msg) ->

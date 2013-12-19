@@ -30,18 +30,10 @@ class OrderDistribution
         deferred.resolve orders
     deferred.promise
 
-  getRetailerProductsByMasterSKU: (skus) ->
+  getRetailerProductByMasterSKU: (sku) ->
     deferred = Q.defer()
-    if _.size(skus) is 0
-      deferred.resolve []
-      return deferred.promise
-    queryString = ""
-    for s,i in skus
-      if i > 0
-        queryString += " or "
-      queryString += "variant.sku=\"#{s}\""
-    query = encodeURIComponent queryString
-    @rest.GET "/product-projection?limit=0&where=#{query}", (error, response, body) ->
+    query = encodeURIComponent "variant.attributes.mastersku=\"#{sku}\""
+    @rest.GET "/product-projections/search?filter=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching products: " + error
       else if response.statusCode != 200
