@@ -179,7 +179,7 @@ describe '#getUnexportedOrders', ->
     @distribution = createOD()
 
   it 'should query orders without epxortInfo', (done) ->
-    spyOn(@distribution.rest, "GET").andCallFake((path, callback) ->
+    spyOn(@distribution.retailerRest, "GET").andCallFake((path, callback) ->
       body =
         results: [
           { exportInfo: [] }
@@ -187,11 +187,11 @@ describe '#getUnexportedOrders', ->
         ]
       callback(null, {statusCode: 200}, JSON.stringify(body)))
 
-    @distribution.getUnexportedOrders(@distribution.rest).then (orders) =>
+    @distribution.getUnexportedOrders(@distribution.retailerRest).then (orders) =>
       expect(_.size(orders)).toBe 1
       expectedURI = '/orders?limit=0&where='
       expectedURI += encodeURIComponent 'createdAt > "2013-12-12T00:00:00.000Z"'
-      expect(@distribution.rest.GET).toHaveBeenCalledWith(expectedURI, jasmine.any(Function))
+      expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(expectedURI, jasmine.any(Function))
       done()
     .fail (msg) ->
       expect(true).toBe false
@@ -202,12 +202,12 @@ describe '#getRetailerProductByMasterSKU', ->
     @distribution = createOD()
 
   it 'should query for products with several skus', (done) ->
-    spyOn(@distribution.rest, "GET").andCallFake((path, callback) ->
+    spyOn(@distribution.retailerRest, "GET").andCallFake((path, callback) ->
       callback(null, {statusCode: 200}, '{ "results": [] }'))
 
     @distribution.getRetailerProductByMasterSKU('foo').then () =>
-      uri = "/product-projections/search?filter=variant.attributes.mastersku%3D%22foo%22"
-      expect(@distribution.rest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
+      uri = "/product-projections/search?lang=de&filter=variant.attributes.mastersku%3A%22foo%22"
+      expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
       done()
     .fail (msg) ->
       expect(true).toBe false
@@ -218,12 +218,12 @@ describe '#getChannelIdByKey', ->
     @distribution = createOD()
 
   it 'should query for channel by key', (done) ->
-    spyOn(@distribution.rest, "GET").andCallFake((path, callback) ->
+    spyOn(@distribution.retailerRest, "GET").andCallFake((path, callback) ->
       callback(null, {statusCode: 200}, '{ "results": [{ "id": "channel123" }] }'))
 
-    @distribution.getChannelIdByKey(@distribution.rest, 'bar').then (channelId) =>
+    @distribution.getChannelIdByKey(@distribution.retailerRest, 'bar').then (channelId) =>
       uri = '/channels?where=key%3D%22bar%22'
-      expect(@distribution.rest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
+      expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
       expect(channelId).toBe 'channel123'
       done()
     .fail (msg) ->
@@ -235,7 +235,7 @@ describe '#addExportInfo', ->
     @distribution = createOD()
 
   it 'should post export info', (done) ->
-    spyOn(@distribution.rest, "POST").andCallFake((path, payload, callback) ->
+    spyOn(@distribution.masterRest, "POST").andCallFake((path, payload, callback) ->
       callback(null, {statusCode: 200}, null))
 
     @distribution.addExportInfo('x', 1, 'y', 'z').then () =>
@@ -248,7 +248,7 @@ describe '#addExportInfo', ->
             id: 'y'
           externalId: 'z'
         ]
-      expect(@distribution.rest.POST).toHaveBeenCalledWith("/orders/x", JSON.stringify(expectedAction), jasmine.any(Function))
+      expect(@distribution.masterRest.POST).toHaveBeenCalledWith("/orders/x", JSON.stringify(expectedAction), jasmine.any(Function))
       done()
     .fail (msg) ->
       expect(true).toBe false

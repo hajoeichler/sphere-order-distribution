@@ -1,4 +1,5 @@
 _ = require('underscore')._
+Config = require '../config'
 Rest = require('sphere-node-connect').Rest
 ProgressBar = require 'progress'
 logentries = require 'node-logentries'
@@ -7,7 +8,8 @@ Q = require 'q'
 class OrderDistribution
   constructor: (@options) ->
     throw new Error 'No configuration in options!' if not @options or not @options.config
-    @rest = new Rest config: @options.config
+    @masterRest = new Rest config: Config.config
+    @retailerRest = new Rest config: @options.config
     @log = logentries.logger token: @options.logentries.token if @options.logentries
 
   elasticio: (msg, cfg, cb, snapshot) ->
@@ -54,8 +56,8 @@ class OrderDistribution
 
   getRetailerProductByMasterSKU: (sku) ->
     deferred = Q.defer()
-    query = encodeURIComponent "variant.attributes.mastersku=\"#{sku}\""
-    @rest.GET "/product-projections/search?filter=#{query}", (error, response, body) ->
+    query = encodeURIComponent "variant.attributes.mastersku:\"#{sku}\""
+    @retailerRest.GET "/product-projections/search?lang=de&filter=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching products: " + error
       else if response.statusCode != 200
@@ -72,26 +74,50 @@ class OrderDistribution
       return
     if @options.showProgress
       @bar = new ProgressBar 'Distributing orders [:bar] :percent done', { width: 50, total: _.size(masterOrders) }
+
+    distributions = []
     for order in masterOrders
       unless @validateSameChannel order
         @log.alert("TODO")
         continue
-      masterSKUs = @extractSKUs order
-      gets = []
-      for s in masterSKUs
-        @getRetailerProductByMasterSKU(s)
-      Q.all(gets).then (retailerProducts) ->
-        masterSKU2retailerSKU = @matchSKUs(retailerProducts, masterSKUs)
-        unless @ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
-          @log.alert("TODO")
-        retailerOrder = @replaceSKUs(order)
-        retailerOrder = @removeChannels(retailerOrder)
-        # TODO:
-        # - import order into retailer and get order id
-        # - add export info to corresponding order in master
-        @returnResult true, 'Nothing to do.', callback
+      distributions.push @distribute (order)
+    Q.all(distributions).then (msg) =>
+      if _.size(msg) is 1
+        msg = msg[0]
+      @returnResult true, msg, callback
+    .fail (msg) =>
+      @returnResult false, msg, callback
+
+  distribute: (masterOrder) ->
+    deferred = Q.defer()
+    masterSKUs = @extractSKUs masterOrder
+    gets = []
+    for s in masterSKUs
+      gets.push @getRetailerProductByMasterSKU(s)
+    Q.all(gets).then (retailerProducts) =>
+      masterSKU2retailerSKU = @matchSKUs(_.flatten(retailerProducts), masterSKUs)
+      unless @ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
+        msg = 'TODO'
+        #@log.alert(msg)
+        deferred.reject msg
+        return deferred.promise
+
+      retailerOrder = @replaceSKUs(masterOrder, masterSKU2retailerSKU)
+      retailerOrder = @removeChannels(retailerOrder)
+      @importOrder(retailerOrder).then (newOrder) =>
+        @getChannelIdByKey(@masterRest, @retailerRest._options.config.project_key).then (channelId) =>
+          @addExportInfo(masterOrder.id, masterOrder.version, channelId, newOrder.id).then (msg) ->
+            deferred.resolve msg
+          .fail (msg) ->
+            deferred.reject msg
+        .fail (msg) ->
+          deferred.reject msg
       .fail (msg) ->
-        @returnResult false, msg, callback
+        deferred.reject msg
+    .fail (msg) ->
+      deferred.reject msg
+
+    deferred.promise
 
   matchSKUs: (products) ->
     masterSKU2retailerSKU = {}
@@ -125,11 +151,22 @@ class OrderDistribution
           id: retailerId
         externalId: retailerOrderId
       ]
-    @rest.POST "/orders/#{orderId}", JSON.stringify(data), (error, response, body) ->
+    @masterRest.POST "/orders/#{orderId}", JSON.stringify(data), (error, response, body) ->
       if error
         deferred.reject "Error on setting export info: " + error
       else if response.statusCode != 200
         deferred.reject "Problem on setting export info (status: #{response.statusCode}): " + body
+      else
+        deferred.resolve "Order exportInfo successfully stored."
+    deferred.promise
+
+  importOrder: (order) ->
+    deferred = Q.defer()
+    @retailerRest.POST "/orders/import", JSON.stringify(order), (error, response, body) ->
+      if error
+        deferred.reject "Error on importing order: " + error
+      else if response.statusCode is not 201
+        deferred.reject "Problem on importing order (status: #{response.statusCode}): " + body
       else
         res = JSON.parse(body)
         deferred.resolve res
