@@ -20,6 +20,24 @@ describe '#run', ->
   it 'should throw error if callback is passed', ->
     expect(=> @distribution.run()).toThrow new Error 'Callback must be a function!'
 
+  it 'should do nothing', (done) ->
+    @distribution.run [], (msg) ->
+      expect(msg.status).toBe true
+      expect(msg.msg).toBe 'Nothing to do.'
+      done()
+
+  it 'should tell that there is an order with different channels', (done) ->
+    o =
+      id: 'foo'
+      lineItems: [
+        { channel: { id: '123' } }
+        { channel: { id: '234' } }
+      ]
+    @distribution.run [o], (msg) ->
+      expect(msg.status).toBe false
+      expect(msg.msg).toBe "The order 'foo' has different channels set!"
+      done()
+
 describe '#validateSameChannel', ->
   beforeEach ->
     @distribution = createOD()

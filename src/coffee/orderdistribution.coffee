@@ -39,7 +39,6 @@ class OrderDistribution
     deferred = Q.defer()
     date = new Date()
     offsetInDays = 7 if offsetInDays is undefined
-    console.log offsetInDays
     date.setDate(date.getDate() - offsetInDays)
     d = "#{date.toISOString().substring(0,10)}T00:00:00.000Z"
     query = encodeURIComponent "createdAt > \"#{d}\""
@@ -78,9 +77,10 @@ class OrderDistribution
 
     for order in masterOrders
       unless @validateSameChannel order
-        msg = "The order @{order.id} has different channels set!"
+        msg = "The order '#{order.id}' has different channels set!"
         @log.alert(msg) if @log
         @returnResult false, msg, callback
+        return
 
     distributions = []
     for order in masterOrders
