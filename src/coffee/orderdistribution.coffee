@@ -38,9 +38,10 @@ class OrderDistribution
   getUnexportedOrders: (rest, offsetInDays) ->
     deferred = Q.defer()
     date = new Date()
-    offsetInDays = 7 unless offsetInDays
+    offsetInDays = 7 if offsetInDays is undefined
+    console.log offsetInDays
     date.setDate(date.getDate() - offsetInDays)
-    d = "#{date.toISOString().substring(0,11)}00:00:00.000Z"
+    d = "#{date.toISOString().substring(0,10)}T00:00:00.000Z"
     query = encodeURIComponent "createdAt > \"#{d}\""
     rest.GET "/orders?limit=0&where=#{query}", (error, response, body) ->
       if error
@@ -75,12 +76,16 @@ class OrderDistribution
     if @options.showProgress
       @bar = new ProgressBar 'Distributing orders [:bar] :percent done', { width: 50, total: _.size(masterOrders) }
 
-    distributions = []
     for order in masterOrders
       unless @validateSameChannel order
-        @log.alert("TODO")
-        continue
+        msg = "The order @{order.id} has different channels set!"
+        @log.alert(msg) if @log
+        @returnResult false, msg, callback
+
+    distributions = []
+    for order in masterOrders
       distributions.push @distribute (order)
+
     Q.all(distributions).then (msg) =>
       if _.size(msg) is 1
         msg = msg[0]
@@ -97,8 +102,8 @@ class OrderDistribution
     Q.all(gets).then (retailerProducts) =>
       masterSKU2retailerSKU = @matchSKUs(_.flatten(retailerProducts), masterSKUs)
       unless @ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
-        msg = 'TODO'
-        #@log.alert(msg)
+        msg = 'Some of the SKUs in the master order can not be translated to retailer SKUs!'
+        @log.alert(msg)
         deferred.reject msg
         return deferred.promise
 

@@ -187,10 +187,10 @@ describe '#getUnexportedOrders', ->
         ]
       callback(null, {statusCode: 200}, JSON.stringify(body)))
 
-    @distribution.getUnexportedOrders(@distribution.retailerRest).then (orders) =>
+    @distribution.getUnexportedOrders(@distribution.retailerRest, 0).then (orders) =>
       expect(_.size(orders)).toBe 1
       expectedURI = '/orders?limit=0&where='
-      expectedURI += encodeURIComponent 'createdAt > "2013-12-12T00:00:00.000Z"'
+      expectedURI += encodeURIComponent "createdAt > \"#{new Date().toISOString().substring(0,10)}T00:00:00.000Z\""
       expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(expectedURI, jasmine.any(Function))
       done()
     .fail (msg) ->
