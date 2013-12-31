@@ -231,23 +231,6 @@ describe '#getRetailerProductByMasterSKU', ->
       expect(true).toBe false
       done()
 
-describe '#getChannelIdByKey', ->
-  beforeEach ->
-    @distribution = createOD()
-
-  it 'should query for channel by key', (done) ->
-    spyOn(@distribution.retailerRest, "GET").andCallFake((path, callback) ->
-      callback(null, {statusCode: 200}, '{ "results": [{ "id": "channel123" }] }'))
-
-    @distribution.getChannelIdByKey(@distribution.retailerRest, 'bar').then (channelId) =>
-      uri = '/channels?where=key%3D%22bar%22'
-      expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
-      expect(channelId).toBe 'channel123'
-      done()
-    .fail (msg) ->
-      expect(true).toBe false
-      done()
-
 describe '#addExportInfo', ->
   beforeEach ->
     @distribution = createOD()

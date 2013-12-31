@@ -17,31 +17,50 @@ describe '#run', ->
       done()
 
   it 'should distribute one order', (done) ->
-    o =
-      lineItems: [ {
-        sku: 'mySKU'
+    unique = new Date().getTime()
+    pt =
+      name: "PT-#{unique}"
+      description: 'bla'
+    @distribution.masterRest.POST '/product-types', JSON.stringify(pt), (error, response, body) =>
+      expect(response.statusCode).toBe 201
+      pt = JSON.parse(body)
+      p =
+        productType:
+          typeId: 'product-type'
+          id: pt.id
         name:
-          de: 'foo'
-        taxRate:
-          name: 'myTax'
-          amount: 0.10
-          includedInPrice: false
-          country: 'DE'
-        quantity: 1
-        price:
-          value:
-            centAmount: 999
+          en: "P-#{unique}"
+        slug:
+          en: "p-#{unique}"
+        masterVariant:
+          sku: "sku-#{unique}"
+      @distribution.masterRest.POST '/products', JSON.stringify(p), (error, response, body) =>
+        expect(response.statusCode).toBe 201
+        o =
+          lineItems: [ {
+            sku: "sku-#{unique}"
+            name:
+              de: 'foo'
+            taxRate:
+              name: 'myTax'
+              amount: 0.10
+              includedInPrice: false
+              country: 'DE'
+            quantity: 1
+            price:
+              value:
+                centAmount: 999
+                currencyCode: 'EUR'
+          } ]
+          totalPrice:
             currencyCode: 'EUR'
-      } ]
-      totalPrice:
-        currencyCode: 'EUR'
-        centAmount: 999
-    @distribution.importOrder(o).then (order) =>
-      @distribution.run [order], (msg) ->
-        expect(msg.status).toBe true
-        expect(msg.msg).toBe 'Order exportInfo successfully stored.'
-        done()
-    .fail (msg) ->
-      console.log msg
-      expect(true).toBe false
-      done()
+            centAmount: 999
+        @distribution.importOrder(o).then (order) =>
+          @distribution.run [order], (msg) ->
+            expect(msg.status).toBe true
+            expect(msg.msg).toBe 'Order exportInfo successfully stored.'
+          done()
+        .fail (msg) ->
+          console.log msg
+          expect(true).toBe false
+          done()

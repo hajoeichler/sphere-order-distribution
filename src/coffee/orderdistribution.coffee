@@ -1,6 +1,7 @@
 _ = require('underscore')._
 Config = require '../config'
 Rest = require('sphere-node-connect').Rest
+InventoryUpdater = require('sphere-node-sync').InventoryUpdater
 ProgressBar = require 'progress'
 logentries = require 'node-logentries'
 Q = require 'q'
@@ -11,6 +12,7 @@ class OrderDistribution
     @masterRest = new Rest config: Config.config
     @retailerRest = new Rest config: @options.config
     @log = logentries.logger token: @options.logentries.token if @options.logentries
+    @inventoryUpdater = new InventoryUpdater config: Config.config
 
   elasticio: (msg, cfg, cb, snapshot) ->
     if msg.body
@@ -18,22 +20,6 @@ class OrderDistribution
       @run(masterOrders, cb)
     else
       @returnResult false, 'No data found in elastic.io msg!', cb
-
-  getChannelIdByKey: (rest, channelKey) ->
-    deferred = Q.defer()
-    query = encodeURIComponent "key=\"#{channelKey}\""
-    rest.GET "/channels?where=#{query}", (error, response, body) ->
-      if error
-        deferred.reject "Error on fetching channel: " + error
-      else if response.statusCode != 200
-        deferred.reject "Problem on fetching channel (status: #{response.statusCode}): " + body
-      else
-        channels = JSON.parse(body).results
-        if _.size(channels) is 1
-          deferred.resolve channels[0].id
-        else
-          deferred.reject "Unexpected number of channels found: #{_.size(channels)}!"
-    deferred.promise
 
   getUnexportedOrders: (rest, offsetInDays) ->
     deferred = Q.defer()
@@ -73,7 +59,7 @@ class OrderDistribution
       @returnResult true, 'Nothing to do.', callback
       return
     if @options.showProgress
-      @bar = new ProgressBar 'Distributing orders [:bar] :percent done', { width: 50, total: _.size(masterOrders) }
+      @bar = new ProgressBar 'Distributing orders [:bar] :current/:total (:percent) done', { width: 80, total: _.size(masterOrders) }
 
     for order in masterOrders
       unless @validateSameChannel order
@@ -110,8 +96,8 @@ class OrderDistribution
       retailerOrder = @replaceSKUs(masterOrder, masterSKU2retailerSKU)
       retailerOrder = @removeChannels(retailerOrder)
       @importOrder(retailerOrder).then (newOrder) =>
-        @getChannelIdByKey(@masterRest, @retailerRest._options.config.project_key).then (channelId) =>
-          @addExportInfo(masterOrder.id, masterOrder.version, channelId, newOrder.id).then (msg) ->
+        @inventoryUpdater.ensureChannelByKey(@masterRest, @retailerRest._options.config.project_key).then (channel) =>
+          @addExportInfo(masterOrder.id, masterOrder.version, channel.id, newOrder.id).then (msg) ->
             deferred.resolve msg
           .fail (msg) ->
             deferred.reject msg
@@ -170,7 +156,7 @@ class OrderDistribution
     @retailerRest.POST "/orders/import", JSON.stringify(order), (error, response, body) ->
       if error
         deferred.reject "Error on importing order: " + error
-      else if response.statusCode is not 201
+      else if response.statusCode != 201
         deferred.reject "Problem on importing order (status: #{response.statusCode}): " + body
       else
         res = JSON.parse(body)
