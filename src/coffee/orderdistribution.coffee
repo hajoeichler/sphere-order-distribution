@@ -211,6 +211,7 @@ class OrderDistribution
         retailerSKU = masterSKU2retailerSKU[masterSKU]
         continue unless retailerSKU
         li.variant.sku = retailerSKU
+        li.sku = retailerSKU # Set sku also directly on line item
         li.variant.attributes = [] unless li.variant.attributes
         a =
           name: 'mastersku'
