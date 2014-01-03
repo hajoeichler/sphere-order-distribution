@@ -15,7 +15,7 @@ options =
     client_secret: argv.clientSecret
 
 impl = new OrderDistribution options
-impl.getUnexportedOrders(rest).then (orders) ->
+impl.getUnexportedOrders(impl.masterRest).then (orders) ->
   impl.run orders, (msg) ->
     console.log msg
 .fail (msg) ->
