@@ -221,8 +221,8 @@ class OrderDistribution
   removeChannels: (order) ->
     if order.lineItems
       for li in order.lineItems
-        if li.channel
-          delete li.channel
+        if li.supplyChannel
+          delete li.supplyChannel
         continue unless li.variant
         continue unless li.variant.prices
         for p in li.variant.prices

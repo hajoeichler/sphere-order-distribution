@@ -176,12 +176,12 @@ describe '#removeChannels', ->
   it 'should remove line item channels', ->
     o =
       lineItems: [
-        { channel:
+        { supplyChannel:
           key: 'retailer1' }
       ]
 
     e = @distribution.removeChannels o
-    expect(e.lineItems.channel).toBeUndefined
+    expect(e.lineItems[0].supplyChannel).toBeUndefined()
 
   it 'should remove channels from variant prices', ->
     o =
@@ -195,7 +195,7 @@ describe '#removeChannels', ->
     o.lineItems[0].variant.prices.push p
 
     e = @distribution.removeChannels o
-    expect(e.lineItems.channel).toBeUndefined
+    expect(e.lineItems[0].variant.prices[0].channel).toBeUndefined()
 
 describe '#getUnexportedOrders', ->
   beforeEach ->
