@@ -1,5 +1,4 @@
 _ = require('underscore')._
-Config = require '../config'
 Rest = require('sphere-node-connect').Rest
 InventoryUpdater = require('sphere-node-sync').InventoryUpdater
 ProgressBar = require 'progress'
@@ -7,12 +6,13 @@ logentries = require 'node-logentries'
 Q = require 'q'
 
 class OrderDistribution
-  constructor: (@options) ->
-    throw new Error 'No configuration in options!' if not @options or not @options.config
-    @masterRest = new Rest config: Config.config
-    @retailerRest = new Rest config: @options.config
+  constructor: (@options = {}) ->
+    throw new Error 'No master configuration in options!' if not @options.master
+    throw new Error 'No master configuration in options!' if not @options.retailer
+    @masterRest = new Rest config: @options.master
+    @retailerRest = new Rest config: @options.retailer
     @log = logentries.logger token: @options.logentries.token if @options.logentries
-    @inventoryUpdater = new InventoryUpdater config: Config.config
+    @inventoryUpdater = new InventoryUpdater config: @options.master
 
   elasticio: (msg, cfg, cb, snapshot) ->
     if msg.body

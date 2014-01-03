@@ -3,15 +3,20 @@ OrderDistribution = require('../main').OrderDistribution
 
 describe 'OrderDistribution', ->
   it 'should throw error that there is no config', ->
-    expect(-> new OrderDistribution()).toThrow new Error 'No configuration in options!'
-    expect(-> new OrderDistribution({})).toThrow new Error 'No configuration in options!'
+    expect(-> new OrderDistribution()).toThrow new Error 'No master configuration in options!'
+    expect(-> new OrderDistribution({})).toThrow new Error 'No master configuration in options!'
 
 createOD = () ->
   c =
-    project_key: 'x'
-    client_id: 'y'
-    client_secret: 'z'
-  new OrderDistribution { config: c }
+    master:
+      project_key: 'x'
+      client_id: 'y'
+      client_secret: 'z'
+    retailer:
+      project_key: 'a'
+      client_id: 'b'
+      client_secret: 'c'
+  new OrderDistribution c
 
 describe '#run', ->
   beforeEach ->

@@ -8,7 +8,10 @@ jasmine.getEnv().defaultTimeoutInterval = 20000
 
 describe '#run', ->
   beforeEach ->
-    @distribution = new OrderDistribution Config
+    options =
+      master: Config.config
+      retailer: Config.config
+    @distribution = new OrderDistribution options
 
   it 'Nothing to do', (done) ->
     @distribution.run [], (msg) ->

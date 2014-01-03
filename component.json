@@ -4,23 +4,41 @@
     "url" : "http://www.commercetools.com",
     "credentials": {
         "fields": {
-            "projectKey": {
+            "masterProjectKey": {
                 "viewClass": "TextFieldView",
                 "label": "Project Key",
                 "required": true,
-                "placeholder": "Paste your project key"
+                "placeholder": "Paste master project key"
             },
-            "clientId": {
+            "masterClientId": {
                 "viewClass": "TextFieldView",
                 "label": "Client Id",
                 "required": true,
-                "placeholder": "Paste your client id"
+                "placeholder": "Paste master client id"
             },
-            "clientSecret": {
+            "masterClientSecret": {
                 "viewClass": "TextFieldView",
                 "label": "Client Secret",
                 "required": true,
-                "placeholder": "Paste your client secret"
+                "placeholder": "Paste master client secret"
+            },
+            "retailerProjectKey": {
+                "viewClass": "TextFieldView",
+                "label": "Project Key",
+                "required": true,
+                "placeholder": "Paste retailer project key"
+            },
+            "retailerClientId": {
+                "viewClass": "TextFieldView",
+                "label": "Client Id",
+                "required": true,
+                "placeholder": "Paste retailer client id"
+            },
+            "retailerClientSecret": {
+                "viewClass": "TextFieldView",
+                "label": "Client Secret",
+                "required": true,
+                "placeholder": "Paste retailer client secret"
             }
         }
     },
