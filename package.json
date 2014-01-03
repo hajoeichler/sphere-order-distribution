@@ -1,9 +1,12 @@
 {
   "name": "sphere-order-distribution",
   "description": "Distributes your SPHERE.IO marketplace orders to the dedicated retailer.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "homepage": "https://github.com/hajoeichler/sphere-order-distribution",
-  "keywords": [ "sphere", "api" ],
+  "keywords": [
+    "sphere",
+    "api"
+  ],
   "author": {
     "name": "Hajo Eichler",
     "email": "hajo.eichler@commercetools.de"
