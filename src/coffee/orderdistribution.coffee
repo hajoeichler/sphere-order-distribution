@@ -36,7 +36,7 @@ class OrderDistribution
       else
         orders = JSON.parse(body).results
         unexportedOrders = _.filter orders, (o) ->
-          _.size(o.exportInfo) > 0
+          _.size(o.exportInfo) == 0
         deferred.resolve unexportedOrders
     deferred.promise
 
