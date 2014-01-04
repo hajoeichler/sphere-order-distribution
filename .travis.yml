@@ -17,7 +17,7 @@ notifications:
     rooms:
       secure: sl29cxk+oGen2lXoQcyyk+4T70snQShB3njksOml9q0iZ79F4BcDo87hx8/l+lbNDfj68i0uI1AOfK8YAotM3gzhfULtKLAJDNIRacg1d1DxE67VVt+v9m5rpcE40lG46nsxv1LVzHbVN1exxAyNNXWRl+ZEYgagiPjHfaRUF68=
     template:
-    - ! '%{repository}#%{build_number} (%{author}): %{message} (<a href="%{build_url}">Details</a> <a href="%{compare_url}">Compare</a>)'
+    - '%{repository}#%{build_number} (%{author}): %{message} (<a href="%{build_url}">Details</a> <a href="%{compare_url}">Compare</a>)'
     format: html
     on_success: change
     on_failure: change
