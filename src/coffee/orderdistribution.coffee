@@ -94,7 +94,7 @@ class OrderDistribution
         return deferred.promise
 
       retailerOrder = @replaceSKUs(masterOrder, masterSKU2retailerSKU)
-      retailerOrder = @removeChannels(retailerOrder)
+      retailerOrder = @removeChannelsAndIds(retailerOrder)
       @importOrder(retailerOrder).then (newOrder) =>
         @inventoryUpdater.ensureChannelByKey(@masterRest, @retailerRest._options.config.project_key).then (channel) =>
           @addExportInfo(masterOrder.id, masterOrder.version, channel.id, newOrder.id).then (msg) ->
@@ -219,16 +219,16 @@ class OrderDistribution
         li.variant.attributes.push a
     order
 
-  removeChannels: (order) ->
+  removeChannelsAndIds: (order) ->
     if order.lineItems
       for li in order.lineItems
-        if li.supplyChannel
-          delete li.supplyChannel
+        delete li.supplyChannel if li.supplyChannel
+        delete li.productId if li.productId
         continue unless li.variant
+        delete li.variant.id if li.variant.id
         continue unless li.variant.prices
         for p in li.variant.prices
-          if p.channel
-            delete p.channel
+          delete p.channel if p.channel
     order
 
 module.exports = OrderDistribution

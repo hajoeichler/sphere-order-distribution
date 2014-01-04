@@ -35,8 +35,8 @@ describe '#run', ->
     o =
       id: 'foo'
       lineItems: [
-        { channel: { id: '123' } }
-        { channel: { id: '234' } }
+        { supplyChannel: { id: '123' } }
+        { supplyChannel: { id: '234' } }
       ]
     @distribution.run [o], (msg) ->
       expect(msg.status).toBe false
@@ -68,7 +68,7 @@ describe '#validateSameChannel', ->
   it 'should be false for different channels', ->
     o =
       lineItems: [
-        channel: { id: 'retailer1' }
+        supplyChannel: { id: 'retailer1' }
         variant:
           prices: [ { channel: id: 'someOther' } ]
       ]
@@ -169,18 +169,35 @@ describe '#replaceSKUs', ->
     expect(e.lineItems[0].variant.attributes[0].name).toBe 'mastersku'
     expect(e.lineItems[0].variant.attributes[0].value).toBe 'masterSKU1'
 
-describe '#removeChannels', ->
+describe '#removeChannelsAndIds', ->
   beforeEach ->
     @distribution = createOD()
+
+  it 'should remove product id', ->
+    o =
+      lineItems: [
+        { productId: 'foo' }
+      ]
+
+    e = @distribution.removeChannelsAndIds o
+    expect(e.lineItems[0].productId).toBeUndefined()
+
+  it 'should remove variant id', ->
+    o =
+      lineItems: [
+        { variant: { id: 'bar'} }
+      ]
+
+    e = @distribution.removeChannelsAndIds o
+    expect(e.lineItems[0].variant.id).toBeUndefined()
 
   it 'should remove line item channels', ->
     o =
       lineItems: [
-        { supplyChannel:
-          key: 'retailer1' }
+        { supplyChannel: { key: 'retailer1' } }
       ]
 
-    e = @distribution.removeChannels o
+    e = @distribution.removeChannelsAndIds o
     expect(e.lineItems[0].supplyChannel).toBeUndefined()
 
   it 'should remove channels from variant prices', ->
@@ -194,7 +211,7 @@ describe '#removeChannels', ->
         key: 'retailerX'
     o.lineItems[0].variant.prices.push p
 
-    e = @distribution.removeChannels o
+    e = @distribution.removeChannelsAndIds o
     expect(e.lineItems[0].variant.prices[0].channel).toBeUndefined()
 
 describe '#getUnexportedOrders', ->
@@ -229,7 +246,7 @@ describe '#getRetailerProductByMasterSKU', ->
       callback(null, {statusCode: 200}, '{ "results": [] }'))
 
     @distribution.getRetailerProductByMasterSKU('foo').then () =>
-      uri = "/product-projections/search?lang=de&filter=variant.attributes.mastersku%3A%22foo%22"
+      uri = "/product-projections/search?lang=de&filter=variants.attributes.mastersku%3A%22foo%22"
       expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
       done()
     .fail (msg) ->
