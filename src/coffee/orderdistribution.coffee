@@ -42,7 +42,7 @@ class OrderDistribution
 
   getRetailerProductByMasterSKU: (sku) ->
     deferred = Q.defer()
-    query = encodeURIComponent "variant.attributes.mastersku:\"#{sku.toLowerCase()}\""
+    query = encodeURIComponent "variants.attributes.mastersku:\"#{sku.toLowerCase()}\""
     @retailerRest.GET "/product-projections/search?lang=de&filter=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching products: " + error
