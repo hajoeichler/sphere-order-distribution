@@ -36,21 +36,21 @@ class OrderDistribution
       else
         orders = JSON.parse(body).results
         unexportedOrders = _.filter orders, (o) ->
-          _.size(o.exportInfo) == 0
+          _.size(o.exportInfo) is 0
         deferred.resolve unexportedOrders
     deferred.promise
 
   getRetailerProductByMasterSKU: (sku) ->
     deferred = Q.defer()
-    query = encodeURIComponent "variant.attributes.mastersku:\"#{sku}\""
+    query = encodeURIComponent "variant.attributes.mastersku:\"#{sku.toLowerCase()}\""
     @retailerRest.GET "/product-projections/search?lang=de&filter=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching products: " + error
       else if response.statusCode != 200
         deferred.reject "Problem on fetching products (status: #{response.statusCode}): " + body
       else
-        orders = JSON.parse(body).results
-        deferred.resolve orders
+        products = JSON.parse(body).results
+        deferred.resolve products
     deferred.promise
 
   run: (masterOrders, callback) ->
@@ -184,8 +184,8 @@ class OrderDistribution
       return channelID is channel.id
     if order.lineItems
       for li in order.lineItems
-        if li.channel
-          return false unless checkChannelId li.channel
+        if li.supplyChannel
+          return false unless checkChannelId li.supplyChannel
         continue unless li.variant
         continue unless li.variant.prices
         for p in li.variant.prices
