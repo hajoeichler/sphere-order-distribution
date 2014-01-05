@@ -5,8 +5,6 @@ argv = require('optimist')
   .argv
 OrderDistribution = require('../main').OrderDistribution
 
-Config.showProgress = true
-
 options =
   master: Config.config
   retailer:
