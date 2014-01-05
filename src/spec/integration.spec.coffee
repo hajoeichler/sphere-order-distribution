@@ -16,7 +16,7 @@ describe '#run', ->
   it 'Nothing to do', (done) ->
     @distribution.run [], (msg) ->
       expect(msg.status).toBe true
-      expect(msg.msg).toBe 'Nothing to do.'
+      expect(msg.message).toBe 'Nothing to do.'
       done()
 
   it 'should distribute one order', (done) ->
@@ -61,7 +61,7 @@ describe '#run', ->
         @distribution.importOrder(o).then (order) =>
           @distribution.run [order], (msg) ->
             expect(msg.status).toBe true
-            expect(msg.msg).toBe 'Order exportInfo successfully stored.'
+            expect(msg.message).toBe 'Order exportInfo successfully stored.'
           done()
         .fail (msg) ->
           console.log msg

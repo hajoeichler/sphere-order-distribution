@@ -28,7 +28,7 @@ describe '#run', ->
   it 'should do nothing', (done) ->
     @distribution.run [], (msg) ->
       expect(msg.status).toBe true
-      expect(msg.msg).toBe 'Nothing to do.'
+      expect(msg.message).toBe 'Nothing to do.'
       done()
 
   it 'should tell that there is an order with different channels', (done) ->
@@ -40,7 +40,7 @@ describe '#run', ->
       ]
     @distribution.run [o], (msg) ->
       expect(msg.status).toBe false
-      expect(msg.msg).toBe "The order 'foo' has different channels set!"
+      expect(msg.message).toBe "The order 'foo' has different channels set!"
       done()
 
 describe '#validateSameChannel', ->

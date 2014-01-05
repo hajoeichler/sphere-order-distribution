@@ -1,23 +1,22 @@
 _ = require('underscore')._
 Rest = require('sphere-node-connect').Rest
+CommonUpdater = require('sphere-node-sync').CommonUpdater
 InventoryUpdater = require('sphere-node-sync').InventoryUpdater
-ProgressBar = require 'progress'
-logentries = require 'node-logentries'
 Q = require 'q'
 
-class OrderDistribution
-  constructor: (@options = {}) ->
-    throw new Error 'No master configuration in options!' if not @options.master
-    throw new Error 'No master configuration in options!' if not @options.retailer
-    @masterRest = new Rest config: @options.master
-    @retailerRest = new Rest config: @options.retailer
-    @log = logentries.logger token: @options.logentries.token if @options.logentries
-    @inventoryUpdater = new InventoryUpdater config: @options.master
+class OrderDistribution extends CommonUpdater
+  constructor: (options = {}) ->
+    super(options)
+    throw new Error 'No master configuration in options!' unless options.master
+    throw new Error 'No master configuration in options!' unless options.retailer
+    @masterRest = new Rest config: options.master
+    @retailerRest = new Rest config: options.retailer
+    @inventoryUpdater = new InventoryUpdater config: options.master
 
   elasticio: (msg, cfg, cb, snapshot) ->
     if msg.body
       masterOrders = msg.body.results
-      @run(masterOrders, cb)
+      @run masterOrders, cb
     else
       @returnResult false, 'No data found in elastic.io msg!', cb
 
@@ -31,7 +30,7 @@ class OrderDistribution
     rest.GET "/orders?limit=0&where=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching orders: " + error
-      else if response.statusCode != 200
+      else if response.statusCode isnt 200
         deferred.reject "Problem on fetching orders (status: #{response.statusCode}): " + body
       else
         orders = JSON.parse(body).results
@@ -46,7 +45,7 @@ class OrderDistribution
     @retailerRest.GET "/product-projections/search?lang=de&filter=#{query}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching products: " + error
-      else if response.statusCode != 200
+      else if response.statusCode isnt 200
         deferred.reject "Problem on fetching products (status: #{response.statusCode}): " + body
       else
         products = JSON.parse(body).results
@@ -58,15 +57,14 @@ class OrderDistribution
     if _.size(masterOrders) is 0
       @returnResult true, 'Nothing to do.', callback
       return
-    if @options.showProgress
-      @bar = new ProgressBar 'Distributing orders [:bar] :current/:total (:percent) done', { width: 80, total: _.size(masterOrders) }
 
     for order in masterOrders
       unless @validateSameChannel order
         msg = "The order '#{order.id}' has different channels set!"
-        @log.alert(msg) if @log
         @returnResult false, msg, callback
         return
+
+    @initProgressBar 'Distributing orders', _.size(masterOrders)
 
     distributions = []
     for order in masterOrders
@@ -89,7 +87,6 @@ class OrderDistribution
       masterSKU2retailerSKU = @matchSKUs(_.flatten(retailerProducts), masterSKUs)
       unless @ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
         msg = 'Some of the SKUs in the master order can not be translated to retailer SKUs!'
-        @log.alert(msg)
         deferred.reject msg
         return deferred.promise
 
@@ -98,6 +95,7 @@ class OrderDistribution
       @importOrder(retailerOrder).then (newOrder) =>
         @inventoryUpdater.ensureChannelByKey(@masterRest, @retailerRest._options.config.project_key).then (channel) =>
           @addExportInfo(masterOrder.id, masterOrder.version, channel.id, newOrder.id).then (msg) ->
+            @tickProgress()
             deferred.resolve msg
           .fail (msg) ->
             deferred.reject msg
@@ -145,7 +143,7 @@ class OrderDistribution
     @masterRest.POST "/orders/#{orderId}", JSON.stringify(data), (error, response, body) ->
       if error
         deferred.reject "Error on setting export info: " + error
-      else if response.statusCode != 200
+      else if response.statusCode isnt 200
         deferred.reject "Problem on setting export info (status: #{response.statusCode}): " + body
       else
         deferred.resolve "Order exportInfo successfully stored."
@@ -156,24 +154,12 @@ class OrderDistribution
     @retailerRest.POST "/orders/import", JSON.stringify(order), (error, response, body) ->
       if error
         deferred.reject "Error on importing order: " + error
-      else if response.statusCode != 201
+      else if response.statusCode isnt 201
         deferred.reject "Problem on importing order (status: #{response.statusCode}): " + body
       else
         res = JSON.parse(body)
         deferred.resolve res
     deferred.promise
-
-  returnResult: (positiveFeedback, msg, callback) ->
-    if @options.showProgress and @bar
-      @bar.terminate()
-    d =
-      component: this.constructor.name
-      status: positiveFeedback
-      msg: msg
-    if @log
-      logLevel = if positiveFeedback then 'info' else 'err'
-      @log.log logLevel, d
-    callback d
 
   validateSameChannel: (order) ->
     channelID = null

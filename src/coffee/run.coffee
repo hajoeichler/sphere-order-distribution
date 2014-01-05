@@ -18,6 +18,7 @@ impl = new OrderDistribution options
 impl.getUnexportedOrders(impl.masterRest).then (orders) ->
   impl.run orders, (msg) ->
     console.log msg
+    process.exit 1 unless msg.status
 .fail (msg) ->
   console.log msg
   process.exit 1
