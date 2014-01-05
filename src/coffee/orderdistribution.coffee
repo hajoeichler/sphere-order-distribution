@@ -94,7 +94,7 @@ class OrderDistribution extends CommonUpdater
       retailerOrder = @removeChannelsAndIds(retailerOrder)
       @importOrder(retailerOrder).then (newOrder) =>
         @inventoryUpdater.ensureChannelByKey(@masterRest, @retailerRest._options.config.project_key).then (channel) =>
-          @addExportInfo(masterOrder.id, masterOrder.version, channel.id, newOrder.id).then (msg) ->
+          @addExportInfo(masterOrder.id, masterOrder.version, channel.id, newOrder.id).then (msg) =>
             @tickProgress()
             deferred.resolve msg
           .fail (msg) ->
