@@ -35,7 +35,7 @@
     "optimist": "0.6.0",
     "q": "~0.9.7",
     "sphere-node-connect": "~0.2.2",
-    "sphere-node-sync": "~0.3.3",
+    "sphere-node-sync": "~0.3.4",
     "underscore": "~1.5.2"
   },
   "devDependencies": {
