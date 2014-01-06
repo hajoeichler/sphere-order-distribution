@@ -61,7 +61,7 @@ describe '#run', ->
         @distribution.importOrder(o).then (order) =>
           @distribution.run [order], (msg) ->
             expect(msg.status).toBe true
-            expect(msg.message).toBe 'Order exportInfo successfully stored.'
+            expect(msg.message).toBe 'Order sync info successfully stored.'
           done()
         .fail (msg) ->
           console.log msg

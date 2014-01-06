@@ -20,7 +20,7 @@ class OrderDistribution extends CommonUpdater
     else
       @returnResult false, 'No data found in elastic.io msg!', cb
 
-  getUnexportedOrders: (rest, offsetInDays) ->
+  getUnSyncedOrders: (rest, offsetInDays) ->
     deferred = Q.defer()
     date = new Date()
     offsetInDays = 7 if offsetInDays is undefined
@@ -34,9 +34,9 @@ class OrderDistribution extends CommonUpdater
         deferred.reject "Problem on fetching orders (status: #{response.statusCode}): " + body
       else
         orders = JSON.parse(body).results
-        unexportedOrders = _.filter orders, (o) ->
-          _.size(o.exportInfo) is 0
-        deferred.resolve unexportedOrders
+        unsyncedOrders = _.filter orders, (o) ->
+          _.size(o.syncInfo) is 0
+        deferred.resolve unsyncedOrders
     deferred.promise
 
   getRetailerProductByMasterSKU: (sku) ->
@@ -94,7 +94,7 @@ class OrderDistribution extends CommonUpdater
       retailerOrder = @removeChannelsAndIds(retailerOrder)
       @importOrder(retailerOrder).then (newOrder) =>
         @inventoryUpdater.ensureChannelByKey(@masterRest, @retailerRest._options.config.project_key).then (channel) =>
-          @addExportInfo(masterOrder.id, masterOrder.version, channel.id, newOrder.id).then (msg) =>
+          @addSyncInfo(masterOrder.id, masterOrder.version, channel.id, newOrder.id).then (msg) =>
             @tickProgress()
             deferred.resolve msg
           .fail (msg) ->
@@ -129,12 +129,12 @@ class OrderDistribution extends CommonUpdater
     difference = _.filter masterSKUs, (sku) ->
       sku unless masterSKU2retailerSKU[sku]
 
-  addExportInfo: (orderId, orderVersion, retailerId, retailerOrderId) ->
+  addSyncInfo: (orderId, orderVersion, retailerId, retailerOrderId) ->
     deferred = Q.defer()
     data =
       version: orderVersion
       actions: [
-        action: 'updateExportInfo'
+        action: 'updateSyncInfo'
         channel:
           typeId: 'channel'
           id: retailerId
@@ -142,11 +142,11 @@ class OrderDistribution extends CommonUpdater
       ]
     @masterRest.POST "/orders/#{orderId}", JSON.stringify(data), (error, response, body) ->
       if error
-        deferred.reject "Error on setting export info: " + error
+        deferred.reject "Error on setting sync info: " + error
       else if response.statusCode isnt 200
-        deferred.reject "Problem on setting export info (status: #{response.statusCode}): " + body
+        deferred.reject "Problem on setting sync info (status: #{response.statusCode}): " + body
       else
-        deferred.resolve "Order exportInfo successfully stored."
+        deferred.resolve "Order sync info successfully stored."
     deferred.promise
 
   importOrder: (order) ->

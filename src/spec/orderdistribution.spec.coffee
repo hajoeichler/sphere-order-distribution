@@ -214,20 +214,20 @@ describe '#removeChannelsAndIds', ->
     e = @distribution.removeChannelsAndIds o
     expect(e.lineItems[0].variant.prices[0].channel).toBeUndefined()
 
-describe '#getUnexportedOrders', ->
+describe '#getUnSyncedOrders', ->
   beforeEach ->
     @distribution = createOD()
 
-  it 'should query orders without epxortInfo', (done) ->
+  it 'should query orders without sync info', (done) ->
     spyOn(@distribution.retailerRest, "GET").andCallFake((path, callback) ->
       body =
         results: [
-          { exportInfo: [] }
-          { exportInfo: [ {} ] }
+          { syncInfo: [] }
+          { syncInfo: [ {} ] }
         ]
       callback(null, {statusCode: 200}, JSON.stringify(body)))
 
-    @distribution.getUnexportedOrders(@distribution.retailerRest, 0).then (orders) =>
+    @distribution.getUnSyncedOrders(@distribution.retailerRest, 0).then (orders) =>
       expect(_.size(orders)).toBe 1
       expectedURI = '/orders?limit=0&where='
       expectedURI += encodeURIComponent "createdAt > \"#{new Date().toISOString().substring(0,10)}T00:00:00.000Z\""
@@ -253,19 +253,19 @@ describe '#getRetailerProductByMasterSKU', ->
       expect(true).toBe false
       done()
 
-describe '#addExportInfo', ->
+describe '#addSyncInfo', ->
   beforeEach ->
     @distribution = createOD()
 
-  it 'should post export info', (done) ->
+  it 'should post sync info', (done) ->
     spyOn(@distribution.masterRest, "POST").andCallFake((path, payload, callback) ->
       callback(null, {statusCode: 200}, null))
 
-    @distribution.addExportInfo('x', 1, 'y', 'z').then () =>
+    @distribution.addSyncInfo('x', 1, 'y', 'z').then () =>
       expectedAction =
         version: 1
         actions: [
-          action: 'updateExportInfo'
+          action: 'updateSyncInfo'
           channel:
             typeId: 'channel'
             id: 'y'
