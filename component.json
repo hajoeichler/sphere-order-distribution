@@ -45,7 +45,7 @@
     "actions": {
         "services": {
             "main": "elasticio.js",
-            "title": "Order Master -> Retailer Distribution",
+            "title": "Order Master -> Retailer Distribution"
         }
     }
 }
