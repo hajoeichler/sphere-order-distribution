@@ -1,4 +1,4 @@
 sphere-order-distribution
 =========================
 
-[![Build Status](https://secure.travis-ci.org/hajoeichler/sphere-order-distribution.png?branch=master)](http://travis-ci.org/hajoeichler/sphere-order-distribution) [![Coverage Status](https://coveralls.io/repos/hajoeichler/sphere-order-distribution/badge.png?branch=master)](https://coveralls.io/r/hajoeichler/sphere-order-distribution?branch=master)
+[![Build Status](https://secure.travis-ci.org/hajoeichler/sphere-order-distribution.png?branch=master)](http://travis-ci.org/hajoeichler/sphere-order-distribution) [![Coverage Status](https://coveralls.io/repos/hajoeichler/sphere-order-distribution/badge.png?branch=master)](https://coveralls.io/r/hajoeichler/sphere-order-distribution?branch=master) [![Dependency Status](https://david-dm.org/hajoeichler/sphere-order-distribution.png?theme=shields.io)](https://david-dm.org/hajoeichler/sphere-order-distribution) [![devDependency Status](https://david-dm.org/hajoeichler/sphere-order-distribution/dev-status.png?theme=shields.io)](https://david-dm.org/hajoeichler/sphere-order-distribution#info=devDependencies)
