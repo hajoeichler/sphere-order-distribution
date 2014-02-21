@@ -126,8 +126,8 @@ class OrderDistribution extends CommonUpdater
     return ret
 
   ensureAllSKUs: (masterSKUs, masterSKU2retailerSKU) ->
-    difference = _.filter masterSKUs, (sku) ->
-      sku unless masterSKU2retailerSKU[sku]
+    _.isEmpty _.filter masterSKUs, (sku) ->
+      true unless masterSKU2retailerSKU[sku]
 
   addSyncInfo: (orderId, orderVersion, retailerId, retailerOrderId) ->
     deferred = Q.defer()

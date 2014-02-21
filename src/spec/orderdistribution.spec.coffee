@@ -125,19 +125,19 @@ describe '#ensureAllSKUs', ->
   it 'should return true for empty inputs', ->
     m2r = {}
     skus = []
-    expect(@distribution.ensureAllSKUs(m2r, skus))
+    expect(@distribution.ensureAllSKUs(skus, m2r)).toBe true
 
   it 'should return true if all SKUs are matched', ->
     m2r =
       123: 234
     skus = [ '123' ]
-    expect(@distribution.ensureAllSKUs(m2r, skus))
+    expect(@distribution.ensureAllSKUs(skus, m2r)).toBe true
 
   it 'should return false if not all SKUs are in the match', ->
     m2r =
       123: 234
     skus = [ '123', 'foo' ]
-    expect(@distribution.ensureAllSKUs(m2r, skus))
+    expect(@distribution.ensureAllSKUs(skus, m2r)).toBe false
 
 
 describe '#replaceSKUs', ->
