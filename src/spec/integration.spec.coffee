@@ -41,7 +41,8 @@ describe '#run', ->
         expect(response.statusCode).toBe 201
         o =
           lineItems: [ {
-            sku: "sku-#{unique}"
+            variant:
+              sku: "sku-#{unique}"
             name:
               de: 'foo'
             taxRate:
