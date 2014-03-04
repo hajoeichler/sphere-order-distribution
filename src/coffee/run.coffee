@@ -15,8 +15,11 @@ options =
 impl = new OrderDistribution options
 impl.getUnSyncedOrders(impl.masterRest).then (orders) ->
   impl.run orders, (msg) ->
-    console.log msg
-    process.exit 1 unless msg.status
+    if msg.status
+      console.log msg
+      process.exit 0
+    console.error msg
+    process.exit 1
 .fail (msg) ->
-  console.log msg
-  process.exit 1
+  console.error msg
+  process.exit 2
