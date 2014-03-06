@@ -11,7 +11,7 @@ logDir = argv.logDir or '.'
 logger = new Logger
   streams: [
     { level: 'warn', stream: process.stderr }
-    { level: 'warn', path: "#{logDir}/sphere-order-distribution-#{argv.projectKey}.log" }
+    { level: 'warn', type: 'rotating-file', period: '1d', count: 90, path: "#{logDir}/sphere-order-distribution-#{argv.projectKey}.log" }
   ]
 
 options =
