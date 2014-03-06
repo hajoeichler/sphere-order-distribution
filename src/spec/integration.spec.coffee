@@ -24,20 +24,19 @@ describe '#run', ->
     pt =
       name: "PT-#{unique}"
       description: 'bla'
-    @distribution.masterRest.POST '/product-types', JSON.stringify(pt), (error, response, body) =>
+    @distribution.masterRest.POST '/product-types', pt, (error, response, body) =>
       expect(response.statusCode).toBe 201
-      pt = JSON.parse(body)
       p =
         productType:
           typeId: 'product-type'
-          id: pt.id
+          id: body.id
         name:
           en: "P-#{unique}"
         slug:
           en: "p-#{unique}"
         masterVariant:
           sku: "sku-#{unique}"
-      @distribution.masterRest.POST '/products', JSON.stringify(p), (error, response, body) =>
+      @distribution.masterRest.POST '/products', p, (error, response, body) =>
         expect(response.statusCode).toBe 201
         o =
           lineItems: [ {

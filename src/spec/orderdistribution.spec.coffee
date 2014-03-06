@@ -6,7 +6,7 @@ describe 'OrderDistribution', ->
     expect(-> new OrderDistribution()).toThrow new Error 'No master configuration in options!'
     expect(-> new OrderDistribution({})).toThrow new Error 'No master configuration in options!'
 
-createOD = () ->
+createOD = ->
   c =
     master:
       project_key: 'x'
@@ -225,7 +225,7 @@ describe '#getUnSyncedOrders', ->
           { syncInfo: [] }
           { syncInfo: [ {} ] }
         ]
-      callback(null, {statusCode: 200}, JSON.stringify(body)))
+      callback(null, {statusCode: 200}, body))
 
     @distribution.getUnSyncedOrders(@distribution.retailerRest, 0).then (orders) =>
       expect(_.size(orders)).toBe 1
@@ -245,7 +245,7 @@ describe '#getRetailerProductByMasterSKU', ->
     spyOn(@distribution.retailerRest, "GET").andCallFake((path, callback) ->
       callback(null, {statusCode: 200}, '{ "results": [] }'))
 
-    @distribution.getRetailerProductByMasterSKU('foo').then () =>
+    @distribution.getRetailerProductByMasterSKU('foo').then =>
       uri = "/product-projections/search?lang=de&filter=variants.attributes.mastersku%3A%22foo%22"
       expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
       done()
@@ -261,7 +261,7 @@ describe '#addSyncInfo', ->
     spyOn(@distribution.masterRest, "POST").andCallFake((path, payload, callback) ->
       callback(null, {statusCode: 200}, null))
 
-    @distribution.addSyncInfo('x', 1, 'y', 'z').then () =>
+    @distribution.addSyncInfo('x', 1, 'y', 'z').then =>
       expectedAction =
         version: 1
         actions: [
@@ -271,7 +271,7 @@ describe '#addSyncInfo', ->
             id: 'y'
           externalId: 'z'
         ]
-      expect(@distribution.masterRest.POST).toHaveBeenCalledWith("/orders/x", JSON.stringify(expectedAction), jasmine.any(Function))
+      expect(@distribution.masterRest.POST).toHaveBeenCalledWith("/orders/x", expectedAction, jasmine.any(Function))
       done()
     .fail (msg) ->
       expect(true).toBe false

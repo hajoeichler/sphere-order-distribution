@@ -33,7 +33,7 @@ class OrderDistribution extends CommonUpdater
       else if response.statusCode isnt 200
         deferred.reject "Problem on fetching orders (status: #{response.statusCode}): " + body
       else
-        orders = JSON.parse(body).results
+        orders = body.results
         unsyncedOrders = _.filter orders, (o) ->
           _.size(o.syncInfo) is 0
         deferred.resolve unsyncedOrders
@@ -48,7 +48,7 @@ class OrderDistribution extends CommonUpdater
       else if response.statusCode isnt 200
         deferred.reject "Problem on fetching products (status: #{response.statusCode}): " + body
       else
-        products = JSON.parse(body).results
+        products = body.results
         deferred.resolve products
     deferred.promise
 
@@ -140,7 +140,7 @@ class OrderDistribution extends CommonUpdater
           id: retailerId
         externalId: retailerOrderId
       ]
-    @masterRest.POST "/orders/#{orderId}", JSON.stringify(data), (error, response, body) ->
+    @masterRest.POST "/orders/#{orderId}", data, (error, response, body) ->
       if error
         deferred.reject "Error on setting sync info: " + error
       else if response.statusCode isnt 200
@@ -151,14 +151,13 @@ class OrderDistribution extends CommonUpdater
 
   importOrder: (order) ->
     deferred = Q.defer()
-    @retailerRest.POST "/orders/import", JSON.stringify(order), (error, response, body) ->
+    @retailerRest.POST "/orders/import", order, (error, response, body) ->
       if error
         deferred.reject "Error on importing order: " + error
       else if response.statusCode isnt 201
         deferred.reject "Problem on importing order (status: #{response.statusCode}): " + body
       else
-        res = JSON.parse(body)
-        deferred.resolve res
+        deferred.resolve body
     deferred.promise
 
   validateSameChannel: (order) ->
