@@ -1,9 +1,18 @@
 Config = require '../config'
+Logger = require './logger'
 argv = require('optimist')
-  .usage('Usage: $0 --projectKey key --clientId id --clientSecret secret')
+  .usage('Usage: $0 --projectKey key --clientId id --clientSecret secret --logDir dir')
   .demand(['projectKey','clientId', 'clientSecret'])
   .argv
 OrderDistribution = require('../main').OrderDistribution
+
+logDir = argv.logDir or '.'
+
+logger = new Logger
+  streams: [
+    { level: 'warn', stream: process.stderr }
+    { level: 'warn', path: "#{logDir}/sphere-order-distribution-#{argv.projectKey}.log" }
+  ]
 
 options =
   master: Config.config
@@ -11,15 +20,17 @@ options =
     project_key: argv.projectKey
     client_id: argv.clientId
     client_secret: argv.clientSecret
+  logConfig:
+    logger: logger
 
 impl = new OrderDistribution options
 impl.getUnSyncedOrders(impl.masterRest).then (orders) ->
   impl.run orders, (msg) ->
     if msg.status
-      console.log msg
+      logger.info msg
       process.exit 0
-    console.error msg
+    logger.error msg
     process.exit 1
 .fail (msg) ->
-  console.error msg
+  logger.error msg
   process.exit 2
