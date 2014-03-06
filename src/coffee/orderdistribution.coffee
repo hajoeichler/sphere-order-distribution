@@ -83,7 +83,8 @@ class OrderDistribution extends CommonUpdater
     gets = []
     for s in masterSKUs
       gets.push @getRetailerProductByMasterSKU(s)
-    Q.all(gets).then (retailerProducts) =>
+    Q.all(gets)
+    .then (retailerProducts) =>
       masterSKU2retailerSKU = @matchSKUs(_.flatten(retailerProducts), masterSKUs)
       unless @ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
         msg = 'Some of the SKUs in the master order can not be translated to retailer SKUs!'
@@ -92,19 +93,19 @@ class OrderDistribution extends CommonUpdater
 
       retailerOrder = @replaceSKUs(masterOrder, masterSKU2retailerSKU)
       retailerOrder = @removeChannelsAndIds(retailerOrder)
-      @importOrder(retailerOrder).then (newOrder) =>
-        @inventoryUpdater.ensureChannelByKey(@masterRest, @retailerRest._options.config.project_key).then (channel) =>
-          @addSyncInfo(masterOrder.id, masterOrder.version, channel.id, newOrder.id).then (msg) =>
-            @tickProgress()
-            deferred.resolve msg
-          .fail (msg) ->
-            deferred.reject msg
-        .fail (msg) ->
-          deferred.reject msg
-      .fail (msg) ->
-        deferred.reject msg
-    .fail (msg) ->
-      deferred.reject msg
+      @importOrder(retailerOrder)
+    .then (newOrder) =>
+      Q.all([
+        @inventoryUpdater.ensureChannelByKey @masterRest, @retailerRest._options.config.project_key
+        @inventoryUpdater.ensureChannelByKey @retailerRest, 'master'
+      ])
+    .spread (channelInMaster, channelInRetailer) =>
+      Q.all([
+        @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
+        @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
+      ])
+    .spread =>
+      @tickProgress()
 
     deferred.promise
 
@@ -129,7 +130,7 @@ class OrderDistribution extends CommonUpdater
     _.isEmpty _.filter masterSKUs, (sku) ->
       true unless masterSKU2retailerSKU[sku]
 
-  addSyncInfo: (orderId, orderVersion, retailerId, retailerOrderId) ->
+  addSyncInfo: (rest, orderId, orderVersion, retailerId, retailerOrderId) ->
     deferred = Q.defer()
     data =
       version: orderVersion
@@ -140,7 +141,7 @@ class OrderDistribution extends CommonUpdater
           id: retailerId
         externalId: retailerOrderId
       ]
-    @masterRest.POST "/orders/#{orderId}", data, (error, response, body) ->
+    rest.POST "/orders/#{orderId}", data, (error, response, body) ->
       if error
         deferred.reject "Error on setting sync info: " + error
       else if response.statusCode isnt 200

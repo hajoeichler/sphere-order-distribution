@@ -14,6 +14,8 @@ logger = new Logger
     { level: 'warn', type: 'rotating-file', period: '1d', count: 90, path: "#{logDir}/sphere-order-distribution-#{argv.projectKey}.log" }
   ]
 
+# TODO: set user agent
+
 options =
   master: Config.config
   retailer:

@@ -261,7 +261,7 @@ describe '#addSyncInfo', ->
     spyOn(@distribution.masterRest, "POST").andCallFake((path, payload, callback) ->
       callback(null, {statusCode: 200}, null))
 
-    @distribution.addSyncInfo('x', 1, 'y', 'z').then =>
+    @distribution.addSyncInfo(@distribution.masterRest, 'x', 1, 'y', 'z').then =>
       expectedAction =
         version: 1
         actions: [
