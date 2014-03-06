@@ -8,7 +8,7 @@ class OrderDistribution extends CommonUpdater
   constructor: (options = {}) ->
     super(options)
     throw new Error 'No master configuration in options!' unless options.master
-    throw new Error 'No master configuration in options!' unless options.retailer
+    throw new Error 'No retailer configuration in options!' unless options.retailer
     @masterRest = new Rest config: options.master
     @retailerRest = new Rest config: options.retailer
     @inventoryUpdater = new InventoryUpdater config: options.master
