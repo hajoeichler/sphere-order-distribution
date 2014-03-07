@@ -1,6 +1,6 @@
 _ = require('underscore')._
 Config = require '../config'
-OrderDistribution = require('../main').OrderDistribution
+OrderDistribution = require '../lib/orderdistribution'
 Q = require('q')
 
 # Increase timeout

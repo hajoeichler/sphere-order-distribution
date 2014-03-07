@@ -1,5 +1,5 @@
 _ = require('underscore')._
-OrderDistribution = require('../main').OrderDistribution
+OrderDistribution = require '../lib/orderdistribution'
 
 describe 'OrderDistribution', ->
   it 'should throw error that there is no config', ->
