@@ -13,13 +13,6 @@ class OrderDistribution extends CommonUpdater
     @retailerRest = new Rest config: options.retailer, logConfig: options.logConfig
     @inventoryUpdater = new InventoryUpdater config: options.master, logConfig: options.logConfig
 
-  elasticio: (msg, cfg, cb, snapshot) ->
-    if msg.body
-      masterOrders = msg.body.results
-      @run masterOrders, cb
-    else
-      @returnResult false, 'No data found in elastic.io msg!', cb
-
   getUnSyncedOrders: (rest, offsetInDays) ->
     deferred = Q.defer()
     date = new Date()
