@@ -42,7 +42,7 @@ class OrderDistribution extends CommonUpdater
   getRetailerProductByMasterSKU: (sku) ->
     deferred = Q.defer()
     query = encodeURIComponent "variants.attributes.mastersku:\"#{sku.toLowerCase()}\""
-    @retailerRest.GET "/product-projections/search?lang=de&filter=#{query}", (error, response, body) ->
+    @retailerRest.GET "/product-projections/search?staged=true&lang=de&filter=#{query}" , (error, response, body) ->
       if error
         deferred.reject "Error on fetching products: " + error
       else if response.statusCode isnt 200
@@ -71,8 +71,6 @@ class OrderDistribution extends CommonUpdater
       distributions.push @distribute (order)
 
     Q.all(distributions).then (msg) =>
-      if _.size(msg) is 1
-        msg = msg[0]
       @returnResult true, msg, callback
     .fail (msg) =>
       @returnResult false, msg, callback
@@ -84,8 +82,8 @@ class OrderDistribution extends CommonUpdater
     for s in masterSKUs
       gets.push @getRetailerProductByMasterSKU(s)
     Q.all(gets)
-    .then (retailerProducts) =>
-      masterSKU2retailerSKU = @matchSKUs(_.flatten(retailerProducts), masterSKUs)
+    .spread (retailerProducts) =>
+      masterSKU2retailerSKU = @matchSKUs retailerProducts
       unless @ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
         msg = 'Some of the SKUs in the master order can not be translated to retailer SKUs!'
         deferred.reject msg
@@ -95,17 +93,20 @@ class OrderDistribution extends CommonUpdater
       retailerOrder = @removeChannelsAndIds(retailerOrder)
       @importOrder(retailerOrder)
     .then (newOrder) =>
+      channelRoles = ['InventorySupply', 'OrderExport', 'OrderImport']
       Q.all([
-        @inventoryUpdater.ensureChannelByKey @masterRest, @retailerRest._options.config.project_key
-        @inventoryUpdater.ensureChannelByKey @retailerRest, 'master'
-      ])
-    .spread (channelInMaster, channelInRetailer) =>
-      Q.all([
-        @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
-        @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
-      ])
-    .spread =>
-      @tickProgress()
+        @inventoryUpdater.ensureChannelByKey @masterRest, @retailerRest._options.config.project_key, channelRoles
+        @inventoryUpdater.ensureChannelByKey @retailerRest, 'master', channelRoles
+      ]).spread (channelInMaster, channelInRetailer) =>
+        Q.all([
+          @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
+          @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
+        ])
+      .then (msg) =>
+        @tickProgress()
+        deferred.resolve msg
+    .fail (msg) ->
+      deferred.reject msg
 
     deferred.promise
 
@@ -130,7 +131,7 @@ class OrderDistribution extends CommonUpdater
     _.isEmpty _.filter masterSKUs, (sku) ->
       true unless masterSKU2retailerSKU[sku]
 
-  addSyncInfo: (rest, orderId, orderVersion, retailerId, retailerOrderId) ->
+  addSyncInfo: (rest, orderId, orderVersion, channelId, externalId) ->
     deferred = Q.defer()
     data =
       version: orderVersion
@@ -138,8 +139,8 @@ class OrderDistribution extends CommonUpdater
         action: 'updateSyncInfo'
         channel:
           typeId: 'channel'
-          id: retailerId
-        externalId: retailerOrderId
+          id: channelId
+        externalId: externalId
       ]
     rest.POST "/orders/#{orderId}", data, (error, response, body) ->
       if error

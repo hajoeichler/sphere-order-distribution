@@ -24,46 +24,70 @@ describe '#run', ->
     pt =
       name: "PT-#{unique}"
       description: 'bla'
+      attributes: [
+        { name: 'mastersku', label: { de: 'Master SKU' }, type: { name: 'text' }, isRequired: false, inputHint: 'SingleLine' }
+      ]
     @distribution.masterRest.POST '/product-types', pt, (error, response, body) =>
       expect(response.statusCode).toBe 201
-      p =
+      pt = body
+      pMaster =
         productType:
           typeId: 'product-type'
-          id: body.id
+          id: pt.id
         name:
-          en: "P-#{unique}"
+          en: "Master-P-#{unique}"
         slug:
-          en: "p-#{unique}"
+          en: "master-p-#{unique}"
         masterVariant:
-          sku: "sku-#{unique}"
-      @distribution.masterRest.POST '/products', p, (error, response, body) =>
+          sku: "masterSku#{unique}"
+      @distribution.masterRest.POST '/products', pMaster, (error, response, body) =>
         expect(response.statusCode).toBe 201
-        o =
-          lineItems: [ {
-            variant:
-              sku: "sku-#{unique}"
-            name:
-              de: 'foo'
-            taxRate:
-              name: 'myTax'
-              amount: 0.10
-              includedInPrice: false
-              country: 'DE'
-            quantity: 1
-            price:
-              value:
-                centAmount: 999
-                currencyCode: 'EUR'
-          } ]
-          totalPrice:
-            currencyCode: 'EUR'
-            centAmount: 999
-        @distribution.importOrder(o).then (order) =>
-          @distribution.run [order], (msg) ->
-            expect(msg.status).toBe true
-            expect(msg.message).toBe 'Order sync info successfully stored.'
-          done()
-        .fail (msg) ->
-          console.log msg
-          expect(true).toBe false
-          done()
+        pRetailer =
+          productType:
+            typeId: 'product-type'
+            id: pt.id
+          name:
+            en: "P-#{unique}"
+          slug:
+            en: "p-#{unique}"
+          masterVariant:
+            sku: "retailerSku#{unique}"
+            attributes: [
+              { name: 'mastersku', value: "masterSku#{unique}"  }
+            ]
+        @distribution.masterRest.POST '/products', pRetailer, (error, response, body) =>
+          expect(response.statusCode).toBe 201
+          o =
+            lineItems: [ {
+              variant:
+                sku: "masterSku#{unique}"
+              name:
+                de: 'foo'
+              taxRate:
+                name: 'myTax'
+                amount: 0.10
+                includedInPrice: false
+                country: 'DE'
+              quantity: 1
+              price:
+                value:
+                  centAmount: 999
+                  currencyCode: 'EUR'
+            } ]
+            totalPrice:
+              currencyCode: 'EUR'
+              centAmount: 999
+          @distribution.importOrder(o).then (order) =>
+            @distribution.run [order], (msg) =>
+              expect(msg.status).toBe true
+              expect(msg.message).toEqual [ 'Order sync info successfully stored.', 'Order sync info successfully stored.']
+              @distribution.masterRest.GET "/orders/#{order.id}", (error, response, body) =>
+                expect(body.syncInfo).toBeDefined()
+                query = encodeURIComponent "syncInfo(externalId = \"#{order.id}\")"
+                @distribution.masterRest.GET "/orders?where=#{query}", (error, response, body) ->
+                  expect(body.total).toBe 1
+                  done()
+          .fail (msg) ->
+            console.log msg
+            expect(true).toBe false
+            done()

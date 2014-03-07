@@ -246,7 +246,7 @@ describe '#getRetailerProductByMasterSKU', ->
       callback(null, {statusCode: 200}, '{ "results": [] }'))
 
     @distribution.getRetailerProductByMasterSKU('foo').then =>
-      uri = "/product-projections/search?lang=de&filter=variants.attributes.mastersku%3A%22foo%22"
+      uri = "/product-projections/search?staged=true&lang=de&filter=variants.attributes.mastersku%3A%22foo%22"
       expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
       done()
     .fail (msg) ->
