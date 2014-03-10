@@ -7,11 +7,12 @@ Q = require 'q'
 class OrderDistribution extends CommonUpdater
   constructor: (options = {}) ->
     super(options)
+    throw new Error 'No base configuration in options!' unless options.baseConfig
     throw new Error 'No master configuration in options!' unless options.master
     throw new Error 'No retailer configuration in options!' unless options.retailer
-    @masterRest = new Rest config: options.master, logConfig: options.logConfig
-    @retailerRest = new Rest config: options.retailer, logConfig: options.logConfig
-    @inventoryUpdater = new InventoryUpdater config: options.master, logConfig: options.logConfig
+    @retailerRest = new Rest config: _.extend(options.master, options.baseConfig)
+    @inventoryUpdater = new InventoryUpdater config: _.extend(options.master, options.baseConfig)
+    @masterRest = @inventoryUpdater.rest
 
   getUnSyncedOrders: (rest, offsetInDays) ->
     deferred = Q.defer()

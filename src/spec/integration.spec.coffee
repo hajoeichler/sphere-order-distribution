@@ -9,6 +9,7 @@ jasmine.getEnv().defaultTimeoutInterval = 20000
 describe '#run', ->
   beforeEach ->
     options =
+      baseConfig: {}
       master: Config.config
       retailer: Config.config
     @distribution = new OrderDistribution options

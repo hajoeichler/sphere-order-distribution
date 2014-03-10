@@ -1,29 +1,32 @@
+package_json = require '../package.json'
 Config = require '../config'
 Logger = require './logger'
+OrderDistribution = require '../lib/orderdistribution'
 argv = require('optimist')
-  .usage('Usage: $0 --projectKey key --clientId id --clientSecret secret --logDir dir')
+  .usage('Usage: $0 --projectKey key --clientId id --clientSecret secret --logDir dir --logLevel level --timeout timeout')
+  .default('logLevel', 'info')
+  .default('logDir', '.')
+  .default('timeout', 60000)
   .demand(['projectKey','clientId', 'clientSecret'])
   .argv
-OrderDistribution = require('../main').OrderDistribution
-
-logDir = argv.logDir or '.'
 
 logger = new Logger
   streams: [
     { level: 'warn', stream: process.stderr }
-    { level: 'warn', type: 'rotating-file', period: '1d', count: 90, path: "#{logDir}/sphere-order-distribution-#{argv.projectKey}.log" }
+    { level: argv.logLevel, type: 'rotating-file', period: '1d', count: 90, path: "#{argv.logDir}/sphere-order-distribution-#{argv.projectKey}.log" }
   ]
 
-# TODO: set user agent
-
 options =
+  baseConfig:
+    timeout: argv.timeout
+    user_agent: "#{package_json.name} - #{package_json.version}"
+    logConfig:
+      logger: logger
   master: Config.config
   retailer:
     project_key: argv.projectKey
     client_id: argv.clientId
     client_secret: argv.clientSecret
-  logConfig:
-    logger: logger
 
 impl = new OrderDistribution options
 impl.getUnSyncedOrders(impl.masterRest).then (orders) ->

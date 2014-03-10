@@ -3,11 +3,12 @@ OrderDistribution = require '../lib/orderdistribution'
 
 describe 'OrderDistribution', ->
   it 'should throw error that there is no config', ->
-    expect(-> new OrderDistribution()).toThrow new Error 'No master configuration in options!'
-    expect(-> new OrderDistribution({})).toThrow new Error 'No master configuration in options!'
+    expect(-> new OrderDistribution()).toThrow new Error 'No base configuration in options!'
+    expect(-> new OrderDistribution({})).toThrow new Error 'No base configuration in options!'
 
 createOD = ->
   c =
+    baseConfig: {}
     master:
       project_key: 'x'
       client_id: 'y'
