@@ -10,8 +10,14 @@ class OrderDistribution extends CommonUpdater
     throw new Error 'No base configuration in options!' unless options.baseConfig
     throw new Error 'No master configuration in options!' unless options.master
     throw new Error 'No retailer configuration in options!' unless options.retailer
-    @retailerRest = new Rest config: _.extend(options.master, options.baseConfig)
-    @inventoryUpdater = new InventoryUpdater config: _.extend(options.master, options.baseConfig)
+
+    masterOpts = _.clone options.baseConfig
+    masterOpts.config = options.master
+    retailerOpts = _.clone options.baseConfig
+    retailerOpts.config = options.retailer
+
+    @retailerRest = new Rest retailerOpts
+    @inventoryUpdater = new InventoryUpdater masterOpts
     @masterRest = @inventoryUpdater.rest
 
   getUnSyncedOrders: (rest, offsetInDays) ->
