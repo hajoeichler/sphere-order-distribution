@@ -13,7 +13,7 @@ argv = require('optimist')
 logger = new Logger
   streams: [
     { level: 'error', stream: process.stderr }
-    { level: argv.logLevel, type: 'rotating-file', period: '1d', count: 90, path: "#{argv.logDir}/sphere-order-distribution-#{argv.projectKey}.log" }
+    { level: argv.logLevel, path: "#{argv.logDir}/sphere-order-distribution-#{argv.projectKey}.log" }
   ]
 
 options =
