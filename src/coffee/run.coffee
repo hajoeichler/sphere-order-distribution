@@ -23,6 +23,9 @@ logger = new Logger
     { level: argv.logLevel, path: "#{argv.logDir}/sphere-order-distribution_#{argv.projectKey}.log" }
   ]
 
+process.on 'SIGUSR2', ->
+  logger.reopenFileStreams()
+
 options =
   baseConfig:
     timeout: argv.timeout
