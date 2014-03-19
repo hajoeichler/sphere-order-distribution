@@ -118,7 +118,8 @@ class OrderDistribution extends CommonUpdater
       if error
         deferred.reject "Error on setting sync info: " + error
       else if response.statusCode isnt 200
-        deferred.reject "Problem on setting sync info (status: #{response.statusCode}): " + body
+        humanReadable = JSON.stringify body, null, ' '
+        deferred.reject "Problem on setting sync info (status: #{response.statusCode}): " + humanReadable
       else
         deferred.resolve "Order sync info successfully stored."
     deferred.promise
@@ -129,7 +130,8 @@ class OrderDistribution extends CommonUpdater
       if error
         deferred.reject "Error on importing order: " + error
       else if response.statusCode isnt 201
-        deferred.reject "Problem on importing order (status: #{response.statusCode}): " + body
+        humanReadable = JSON.stringify body, null, ' '
+        deferred.reject "Problem on importing order (status: #{response.statusCode}): " + humanReadable
       else
         deferred.resolve body
     deferred.promise
