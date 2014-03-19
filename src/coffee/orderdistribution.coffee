@@ -5,6 +5,9 @@ InventoryUpdater = require('sphere-node-sync').InventoryUpdater
 Q = require 'q'
 
 class OrderDistribution extends CommonUpdater
+
+  CHANNEL_ROLES = ['InventorySupply', 'OrderExport', 'OrderImport']
+
   constructor: (options = {}) ->
     super(options)
     throw new Error 'No base configuration in options!' unless options.baseConfig
@@ -22,12 +25,8 @@ class OrderDistribution extends CommonUpdater
 
   getUnSyncedOrders: (rest, offsetInDays) ->
     deferred = Q.defer()
-    date = new Date()
-    offsetInDays = 7 if offsetInDays is undefined
-    date.setDate(date.getDate() - offsetInDays)
-    d = "#{date.toISOString().substring(0,10)}T00:00:00.000Z"
-    query = encodeURIComponent "createdAt > \"#{d}\""
-    rest.GET "/orders?limit=0&where=#{query}", (error, response, body) ->
+    sort = encodeURIComponent "createdAt DESC"
+    rest.GET "/orders?sort=#{sort}", (error, response, body) ->
       if error
         deferred.reject "Error on fetching orders: " + error
       else if response.statusCode isnt 200
@@ -35,7 +34,7 @@ class OrderDistribution extends CommonUpdater
       else
         orders = body.results
         unsyncedOrders = _.filter orders, (o) ->
-          _.size(o.syncInfo) is 0
+          not o.syncInfo? or _.isEmpty(o.syncInfo)
         deferred.resolve unsyncedOrders
     deferred.promise
 
@@ -48,88 +47,63 @@ class OrderDistribution extends CommonUpdater
       else if response.statusCode isnt 200
         deferred.reject "Problem on fetching products (status: #{response.statusCode}): " + body
       else
-        products = body.results
-        deferred.resolve products
+        console.log "BODY", body.results
+        if _.size(body.results) is 1
+          deferred.resolve body.results[0]
+        else
+          deferred.reject "Can't find product for sku '#{sku}'."
     deferred.promise
 
-  run: (masterOrders, callback) ->
-    throw new Error 'Callback must be a function!' unless _.isFunction callback
+  run: (masterOrders) ->
     if _.size(masterOrders) is 0
-      @returnResult true, 'Nothing to do.', callback
-      return
+      Q('Nothing to do.')
+    else
+      [validOrders, badOrders] = _.partition masterOrders, (order) =>
+        @validateSameChannel order
 
-    for order in masterOrders
-      unless @validateSameChannel order
-        msg = "The order '#{order.id}' has different channels set!"
-        @returnResult false, msg, callback
-        return
+      _.each badOrders, (bad) ->
+        console.error "The order '#{bad.id}' has different channels set!"
 
-    @initProgressBar 'Distributing orders', _.size(masterOrders)
+      distributions = _.map validOrders, (order) =>
+        @distribute order
 
-    distributions = []
-    for order in masterOrders
-      distributions.push @distribute (order)
-
-    Q.all(distributions).then (msg) =>
-      @returnResult true, msg, callback
-    .fail (msg) =>
-      @returnResult false, msg, callback
+      Q.all(distributions)
 
   distribute: (masterOrder) ->
-    deferred = Q.defer()
     masterSKUs = @extractSKUs masterOrder
-    gets = []
-    for s in masterSKUs
-      gets.push @getRetailerProductByMasterSKU(s)
+
+    gets = _.map masterSKUs, (sku) =>
+      @getRetailerProductByMasterSKU(sku)
+
     Q.all(gets)
     .spread (retailerProducts) =>
       masterSKU2retailerSKU = @matchSKUs retailerProducts
-      unless @ensureAllSKUs(masterSKUs, masterSKU2retailerSKU)
-        msg = 'Some of the SKUs in the master order can not be translated to retailer SKUs!'
-        deferred.reject msg
-        return deferred.promise
 
-      retailerOrder = @replaceSKUs(masterOrder, masterSKU2retailerSKU)
-      retailerOrder = @removeChannelsAndIds(retailerOrder)
+      retailerOrder = @replaceSKUs masterOrder, masterSKU2retailerSKU
+      retailerOrder = @removeChannelsAndIds retailerOrder
+
       @importOrder(retailerOrder)
     .then (newOrder) =>
-      channelRoles = ['InventorySupply', 'OrderExport', 'OrderImport']
       Q.all([
-        @inventoryUpdater.ensureChannelByKey @masterRest, @retailerRest._options.config.project_key, channelRoles
-        @inventoryUpdater.ensureChannelByKey @retailerRest, 'master', channelRoles
-      ]).spread (channelInMaster, channelInRetailer) =>
-        Q.all([
-          @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
-          @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
-        ])
-      .then (msg) =>
-        @tickProgress()
-        deferred.resolve msg
-    .fail (msg) ->
-      deferred.reject msg
+        @inventoryUpdater.ensureChannelByKey @masterRest, @retailerRest._options.config.project_key, CHANNEL_ROLES
+        @inventoryUpdater.ensureChannelByKey @retailerRest, 'master', CHANNEL_ROLES
+      ])
+    .spread (channelInMaster, channelInRetailer) =>
+      Q.all([
+        @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
+        @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
+      ])
 
-    deferred.promise
+  matchSKUs: (retailerProducts) ->
+    allVariants = _.flatten _.map(retailerProducts, (p) -> [p.masterVariant].concat(p.variants or []))
+    reducefn = (acc, v) ->
+      console.log "V", v
+      a = _.find v.attributes, (a) -> a.name is 'mastersku'
+      if a?
+        acc[a.value] = v.sku
+      acc
+    _.reduce allVariants, reducefn, {}
 
-  matchSKUs: (products) ->
-    masterSKU2retailerSKU = {}
-    for product in products
-      _.extend masterSKU2retailerSKU, @matchVariantSKU(product.masterVariant)
-      continue unless product.variants
-      for v in product.variants
-        _.extend masterSKU2retailerSKU, @matchVariantSKU(v)
-    masterSKU2retailerSKU
-
-  matchVariantSKU: (variant) ->
-    ret = {}
-    for a in variant.attributes
-      continue unless a.name is 'mastersku'
-      ret[a.value] = variant.sku
-      break
-    return ret
-
-  ensureAllSKUs: (masterSKUs, masterSKU2retailerSKU) ->
-    _.isEmpty _.filter masterSKUs, (sku) ->
-      true unless masterSKU2retailerSKU[sku]
 
   addSyncInfo: (rest, orderId, orderVersion, channelId, externalId) ->
     deferred = Q.defer()
@@ -181,13 +155,7 @@ class OrderDistribution extends CommonUpdater
     true
 
   extractSKUs: (order) ->
-    skus = []
-    if order.lineItems
-      for li in order.lineItems
-        continue unless li.variant
-        continue unless li.variant.sku
-        skus.push li.variant.sku
-    skus
+    _.map _.filter(order.lineItems or [], (li) -> li.variant? and li.variant.sku? ), (li) -> li.variant.sku
 
   replaceSKUs: (order, masterSKU2retailerSKU) ->
     if order.lineItems
@@ -195,27 +163,21 @@ class OrderDistribution extends CommonUpdater
         continue unless li.variant
         continue unless li.variant.sku
         masterSKU = li.variant.sku
-        retailerSKU = masterSKU2retailerSKU[masterSKU]
-        continue unless retailerSKU
-        li.variant.sku = retailerSKU
-        li.sku = retailerSKU # Set sku also directly on line item
-        li.variant.attributes = [] unless li.variant.attributes
-        a =
-          name: 'mastersku'
-          value: masterSKU
-        li.variant.attributes.push a
+        li.variant.sku = masterSKU2retailerSKU[masterSKU]
+
     order
 
-  removeChannelsAndIds: (order) ->
-    if order.lineItems
-      for li in order.lineItems
-        delete li.supplyChannel if li.supplyChannel
-        delete li.productId if li.productId
-        continue unless li.variant
-        delete li.variant.id if li.variant.id
-        continue unless li.variant.prices
-        for p in li.variant.prices
-          delete p.channel if p.channel
+  removeIdsAndVariantData: (order) ->
+    _.each order.lineItems or [], (li) ->
+      delete li.supplyChannel if li.supplyChannel?
+      delete li.productId if li.productId?
+      if li.variant?
+        delete li.variant.id if li.variant.id?
+        delete li.variant.attributes if li.variant.attributes?
+        delete li.variant.images if li.variant.images?
+        _.each li.variant.prices or [], (price) ->
+          delete price.channel if price.channel?
+
     order
 
 module.exports = OrderDistribution

@@ -41,13 +41,12 @@ options =
 options.baseConfig.host = argv.sphereHost if argv.sphereHost?
 
 impl = new OrderDistribution options
-impl.getUnSyncedOrders(impl.masterRest).then (orders) ->
-  impl.run orders, (msg) ->
-    if msg.status
-      logger.info msg
-      process.exit 0
-    logger.error msg
-    process.exit 1
+impl.getUnSyncedOrders(impl.masterRest)
+.then (orders) ->
+  impl.run(orders)
+.then (msg) ->
+  logger.info info: msg
+  process.exit 0
 .fail (msg) ->
-  logger.error msg
-  process.exit 2
+  logger.error error: msg
+  process.exit 1
