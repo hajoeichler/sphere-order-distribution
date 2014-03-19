@@ -45,8 +45,8 @@ impl.getUnSyncedOrders(impl.masterRest)
 .then (orders) ->
   impl.run(orders)
 .then (msg) ->
-  logger.info info: msg
+  logger.info info: msg, msg
   process.exit 0
 .fail (msg) ->
-  logger.error error: msg
+  logger.error error: msg, msg
   process.exit 1

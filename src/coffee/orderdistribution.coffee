@@ -171,6 +171,7 @@ class OrderDistribution extends CommonUpdater
     _.each order.lineItems or [], (li) ->
       delete li.supplyChannel if li.supplyChannel?
       delete li.productId if li.productId?
+      delete li.states if li.states?
       if li.variant?
         delete li.variant.id if li.variant.id?
         delete li.variant.attributes if li.variant.attributes?
