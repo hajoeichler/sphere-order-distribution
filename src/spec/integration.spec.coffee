@@ -21,7 +21,7 @@ describe '#run', ->
     .fail (msg) ->
       done msg
 
-  xit 'should distribute one order', (done) ->
+  it 'should distribute one order', (done) ->
     unique = new Date().getTime()
     pt =
       name: "PT-#{unique}"
@@ -81,8 +81,7 @@ describe '#run', ->
               centAmount: 999
           @distribution.importOrder(o).then (order) =>
             @distribution.run([order]).then (msg) =>
-              expect(msg.status).toBe true
-              expect(msg.message).toEqual [ 'Order sync info successfully stored.', 'Order sync info successfully stored.']
+              expect(msg).toEqual [ [ 'Order sync info successfully stored.', 'Order sync info successfully stored.'] ]
               @distribution.masterRest.GET "/orders/#{order.id}", (error, response, body) =>
                 expect(body.syncInfo).toBeDefined()
                 query = encodeURIComponent "syncInfo(externalId = \"#{order.id}\")"
@@ -90,6 +89,4 @@ describe '#run', ->
                   expect(body.total).toBe 1
                   done()
           .fail (msg) ->
-            console.log msg
-            expect(true).toBe false
-            done()
+            done msg

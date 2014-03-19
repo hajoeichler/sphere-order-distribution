@@ -47,7 +47,6 @@ class OrderDistribution extends CommonUpdater
       else if response.statusCode isnt 200
         deferred.reject "Problem on fetching products (status: #{response.statusCode}): " + body
       else
-        console.log "BODY", body.results
         if _.size(body.results) is 1
           deferred.resolve body.results[0]
         else
@@ -76,11 +75,11 @@ class OrderDistribution extends CommonUpdater
       @getRetailerProductByMasterSKU(sku)
 
     Q.all(gets)
-    .spread (retailerProducts) =>
+    .then (retailerProducts) =>
       masterSKU2retailerSKU = @matchSKUs retailerProducts
 
       retailerOrder = @replaceSKUs masterOrder, masterSKU2retailerSKU
-      retailerOrder = @removeChannelsAndIds retailerOrder
+      retailerOrder = @removeIdsAndVariantData retailerOrder
 
       @importOrder(retailerOrder)
     .then (newOrder) =>
@@ -88,16 +87,15 @@ class OrderDistribution extends CommonUpdater
         @inventoryUpdater.ensureChannelByKey @masterRest, @retailerRest._options.config.project_key, CHANNEL_ROLES
         @inventoryUpdater.ensureChannelByKey @retailerRest, 'master', CHANNEL_ROLES
       ])
-    .spread (channelInMaster, channelInRetailer) =>
-      Q.all([
-        @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
-        @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
-      ])
+      .spread (channelInMaster, channelInRetailer) =>
+        Q.all([
+          @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
+          @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
+        ])
 
   matchSKUs: (retailerProducts) ->
     allVariants = _.flatten _.map(retailerProducts, (p) -> [p.masterVariant].concat(p.variants or []))
     reducefn = (acc, v) ->
-      console.log "V", v
       a = _.find v.attributes, (a) -> a.name is 'mastersku'
       if a?
         acc[a.value] = v.sku
