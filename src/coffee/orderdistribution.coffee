@@ -27,7 +27,7 @@ class OrderDistribution extends CommonUpdater
     deferred = Q.defer()
     sort = encodeURIComponent "createdAt DESC"
     rest.GET "/orders?sort=#{sort}", (error, response, body) ->
-      if error
+      if error?
         deferred.reject "Error on fetching orders: " + error
       else if response.statusCode isnt 200
         deferred.reject "Problem on fetching orders (status: #{response.statusCode}): " + body
@@ -38,11 +38,25 @@ class OrderDistribution extends CommonUpdater
         deferred.resolve unsyncedOrders
     deferred.promise
 
+  getTaxCategory: (rest) ->
+    deferred = Q.defer()
+    rest.GET "/tax-categories?limit=1", (error, response, body) ->
+      if error?
+        deferred.reject "Error on fetching tax category: " + error
+      else if response.statusCode isnt 200
+        deferred.reject "Problem on fetching tax category (status: #{response.statusCode}): " + body
+      else
+        if _.size(body.results) is 1
+          deferred.resolve body.results[0]
+        else
+          deferred.reject "Can't find tax category."
+    deferred.promise
+
   getRetailerProductByMasterSKU: (sku) ->
     deferred = Q.defer()
     query = encodeURIComponent "variants.attributes.mastersku:\"#{sku.toLowerCase()}\""
     @retailerRest.GET "/product-projections/search?staged=true&lang=de&filter=#{query}" , (error, response, body) ->
-      if error
+      if error?
         deferred.reject "Error on fetching products: " + error
       else if response.statusCode isnt 200
         deferred.reject "Problem on fetching products (status: #{response.statusCode}): " + body
@@ -71,27 +85,31 @@ class OrderDistribution extends CommonUpdater
   distribute: (masterOrder) ->
     masterSKUs = @extractSKUs masterOrder
 
-    gets = _.map masterSKUs, (sku) =>
-      @getRetailerProductByMasterSKU(sku)
+    @getTaxCategory(@retailerRest)
+    .then (taxCategory) =>
 
-    Q.all(gets)
-    .then (retailerProducts) =>
-      masterSKU2retailerSKU = @matchSKUs retailerProducts
+      gets = _.map masterSKUs, (sku) =>
+        @getRetailerProductByMasterSKU(sku)
 
-      retailerOrder = @replaceSKUs masterOrder, masterSKU2retailerSKU
-      retailerOrder = @removeIdsAndVariantData retailerOrder
+      Q.all(gets)
+      .then (retailerProducts) =>
+        masterSKU2retailerSKU = @matchSKUs retailerProducts
 
-      @importOrder(retailerOrder)
-    .then (newOrder) =>
-      Q.all([
-        @inventoryUpdater.ensureChannelByKey @masterRest, @retailerRest._options.config.project_key, CHANNEL_ROLES
-        @inventoryUpdater.ensureChannelByKey @retailerRest, 'master', CHANNEL_ROLES
-      ])
-      .spread (channelInMaster, channelInRetailer) =>
+        retailerOrder = @replaceSKUs masterOrder, masterSKU2retailerSKU
+        retailerOder = @replaceTaxCategories retailerOrder, taxCategory
+        retailerOrder = @removeIdsAndVariantData retailerOrder
+
+        @importOrder(retailerOrder)
+      .then (newOrder) =>
         Q.all([
-          @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
-          @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
+          @inventoryUpdater.ensureChannelByKey @masterRest, @retailerRest._options.config.project_key, CHANNEL_ROLES
+          @inventoryUpdater.ensureChannelByKey @retailerRest, 'master', CHANNEL_ROLES
         ])
+        .spread (channelInMaster, channelInRetailer) =>
+          Q.all([
+            @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
+            @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
+          ])
 
   matchSKUs: (retailerProducts) ->
     allVariants = _.flatten _.map(retailerProducts, (p) -> [p.masterVariant].concat(p.variants or []))
@@ -115,7 +133,7 @@ class OrderDistribution extends CommonUpdater
         externalId: externalId
       ]
     rest.POST "/orders/#{orderId}", data, (error, response, body) ->
-      if error
+      if error?
         deferred.reject "Error on setting sync info: " + error
       else if response.statusCode isnt 200
         humanReadable = JSON.stringify body, null, ' '
@@ -126,8 +144,9 @@ class OrderDistribution extends CommonUpdater
 
   importOrder: (order) ->
     deferred = Q.defer()
+    console.log "IMPORT %j", order
     @retailerRest.POST "/orders/import", order, (error, response, body) ->
-      if error
+      if error?
         deferred.reject "Error on importing order: " + error
       else if response.statusCode isnt 201
         humanReadable = JSON.stringify body, null, ' '
@@ -143,14 +162,14 @@ class OrderDistribution extends CommonUpdater
         channelID = channel.id
         return true
       return channelID is channel.id
-    if order.lineItems
+    if order.lineItems?
       for li in order.lineItems
-        if li.supplyChannel
+        if li.supplyChannel?
           return false unless checkChannelId li.supplyChannel
         continue unless li.variant
         continue unless li.variant.prices
         for p in li.variant.prices
-          if p.channel
+          if p.channel?
             return false unless checkChannelId p.channel
     true
 
@@ -158,7 +177,7 @@ class OrderDistribution extends CommonUpdater
     _.map _.filter(order.lineItems or [], (li) -> li.variant? and li.variant.sku? ), (li) -> li.variant.sku
 
   replaceSKUs: (order, masterSKU2retailerSKU) ->
-    if order.lineItems
+    if order.lineItems?
       for li in order.lineItems
         continue unless li.variant
         continue unless li.variant.sku
@@ -167,9 +186,16 @@ class OrderDistribution extends CommonUpdater
 
     order
 
+  replaceTaxCategories: (order, taxCategory) ->
+    if order.shippingInfo? and order.shippingInfo.taxCategory?
+      order.shippingInfo.taxCategory[id] = taxCategory.id
+
+    order
+
   removeIdsAndVariantData: (order) ->
     _.each order.lineItems or [], (li) ->
       delete li.supplyChannel if li.supplyChannel?
+      delete li.id if li.id?
       delete li.productId if li.productId?
       delete li.states if li.states?
       if li.variant?
