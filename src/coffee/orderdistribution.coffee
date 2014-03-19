@@ -188,16 +188,21 @@ class OrderDistribution extends CommonUpdater
 
   replaceTaxCategories: (order, taxCategory) ->
     if order.shippingInfo? and order.shippingInfo.taxCategory?
-      order.shippingInfo.taxCategory[id] = taxCategory.id
+      order.shippingInfo.taxCategory['id'] = taxCategory.id
 
     order
 
   removeIdsAndVariantData: (order) ->
+    delete order.createdAt if order.createdAt?
+    delete order.lastModifiedAt if order.lastModifiedAt?
+    delete order.lastMessageSequenceNumber if order.lastMessageSequenceNumber?
+    delete order.syncInfo if order.syncInfo?
+
     _.each order.lineItems or [], (li) ->
       delete li.supplyChannel if li.supplyChannel?
       delete li.id if li.id?
       delete li.productId if li.productId?
-      delete li.states if li.states?
+      delete li.state if li.state?
       if li.variant?
         delete li.variant.id if li.variant.id?
         delete li.variant.attributes if li.variant.attributes?
