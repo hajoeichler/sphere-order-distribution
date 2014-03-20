@@ -6,7 +6,7 @@ Q = require('q')
 # Increase timeout
 jasmine.getEnv().defaultTimeoutInterval = 20000
 
-describe '#run', ->
+describe '#distributeOrders', ->
   beforeEach ->
     options =
       baseConfig: {}
@@ -15,7 +15,7 @@ describe '#run', ->
     @distribution = new OrderDistribution options
 
   it 'Nothing to do', (done) ->
-    @distribution.run([]).then (msg) ->
+    @distribution.distributeOrders([]).then (msg) ->
       expect(msg).toBe 'Nothing to do.'
       done()
     .fail (msg) ->
@@ -59,34 +59,39 @@ describe '#run', ->
             ]
         @distribution.masterRest.POST '/products', pRetailer, (error, response, body) =>
           expect(response.statusCode).toBe 201
-          o =
-            lineItems: [ {
-              variant:
-                sku: "masterSku#{unique}"
-              name:
-                de: 'foo'
-              taxRate:
-                name: 'myTax'
-                amount: 0.10
-                includedInPrice: false
-                country: 'DE'
-              quantity: 1
-              price:
-                value:
-                  centAmount: 999
-                  currencyCode: 'EUR'
-            } ]
-            totalPrice:
-              currencyCode: 'EUR'
-              centAmount: 999
-          @distribution.importOrder(o).then (order) =>
-            @distribution.run([order]).then (msg) =>
-              expect(msg).toEqual [ [ 'Order sync info successfully stored.', 'Order sync info successfully stored.'] ]
-              @distribution.masterRest.GET "/orders/#{order.id}", (error, response, body) =>
-                expect(body.syncInfo).toBeDefined()
-                query = encodeURIComponent "syncInfo(externalId = \"#{order.id}\")"
-                @distribution.masterRest.GET "/orders?where=#{query}", (error, response, body) ->
-                  expect(body.total).toBe 1
-                  done()
+          @distribution.inventoryUpdater.ensureChannelByKey(@distribution.masterRest, @distribution.retailerRest._options.config.project_key)
+          .then (channel) =>
+            o =
+              lineItems: [ {
+                supplyChannel:
+                  id: channel.id
+                  typeId: 'channel'
+                variant:
+                  sku: "masterSku#{unique}"
+                name:
+                  de: 'foo'
+                taxRate:
+                  name: 'myTax'
+                  amount: 0.10
+                  includedInPrice: false
+                  country: 'DE'
+                quantity: 1
+                price:
+                  value:
+                    centAmount: 999
+                    currencyCode: 'EUR'
+              } ]
+              totalPrice:
+                currencyCode: 'EUR'
+                centAmount: 999
+            @distribution.importOrder(o).then (order) =>
+              @distribution.run().then (msg) =>
+                expect(msg).toEqual [ [ 'Order sync info successfully stored.', 'Order sync info successfully stored.'] ]
+                @distribution.masterRest.GET "/orders/#{order.id}", (error, response, body) =>
+                  expect(body.syncInfo).toBeDefined()
+                  query = encodeURIComponent "syncInfo(externalId = \"#{order.id}\")"
+                  @distribution.masterRest.GET "/orders?where=#{query}", (error, response, body) ->
+                    expect(body.total).toBe 1
+                    done()
           .fail (msg) ->
             done msg

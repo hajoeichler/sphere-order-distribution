@@ -23,18 +23,22 @@ class OrderDistribution extends CommonUpdater
     @inventoryUpdater = new InventoryUpdater masterOpts
     @masterRest = @inventoryUpdater.rest
 
-  getUnSyncedOrders: (rest, offsetInDays) ->
+  getUnSyncedOrders: (rest, channelId) ->
     deferred = Q.defer()
     sort = encodeURIComponent "createdAt DESC"
-    rest.GET "/orders?sort=#{sort}", (error, response, body) ->
+    query = ''
+#    if channelId?
+#      query = "&where=" + encodeURIComponent "lineItems(supplyChannel(id = \"#{channelId}\"))"
+    rest.PAGED "/orders?sort=#{sort}#{query}", (error, response, body) ->
       if error?
         deferred.reject "Error on fetching orders: " + error
       else if response.statusCode isnt 200
-        deferred.reject "Problem on fetching orders (status: #{response.statusCode}): " + body
+        humanReadable = JSON.stringify body, null, 2
+        deferred.reject "Problem on fetching orders (status: #{response.statusCode}): " + humanReadable
       else
-        orders = body.results
-        unsyncedOrders = _.filter orders, (o) ->
-          not o.syncInfo? or _.isEmpty(o.syncInfo)
+        unsyncedOrders = _.filter body.results, (o) ->
+          (not o.syncInfo? or _.isEmpty(o.syncInfo)) and
+          (not _.isEmpty(o.lineItems) and o.lineItems[0].supplyChannel? and o.lineItems[0].supplyChannel.id is channelId)
         deferred.resolve unsyncedOrders
     deferred.promise
 
@@ -44,7 +48,8 @@ class OrderDistribution extends CommonUpdater
       if error?
         deferred.reject "Error on fetching tax category: " + error
       else if response.statusCode isnt 200
-        deferred.reject "Problem on fetching tax category (status: #{response.statusCode}): " + body
+        humanReadable = JSON.stringify body, null, 2
+        deferred.reject "Problem on fetching tax category (status: #{response.statusCode}): " + humanReadable
       else
         if _.size(body.results) is 1
           deferred.resolve body.results[0]
@@ -67,7 +72,14 @@ class OrderDistribution extends CommonUpdater
           deferred.reject "Can't find product for sku '#{sku}'."
     deferred.promise
 
-  run: (masterOrders) ->
+  run: () ->
+    @inventoryUpdater.ensureChannelByKey(@masterRest, @retailerRest._options.config.project_key, CHANNEL_ROLES)
+    .then (channel) =>
+      @getUnSyncedOrders @masterRest, channel.id
+    .then (masterOrders) =>
+      @distributeOrders masterOrders
+
+  distributeOrders: (masterOrders) ->
     if _.size(masterOrders) is 0
       Q('Nothing to do.')
     else
@@ -78,11 +90,11 @@ class OrderDistribution extends CommonUpdater
         console.error "The order '#{bad.id}' has different channels set!"
 
       distributions = _.map validOrders, (order) =>
-        @distribute order
+        @distributeOrder order
 
       Q.all(distributions)
 
-  distribute: (masterOrder) ->
+  distributeOrder: (masterOrder) ->
     masterSKUs = @extractSKUs masterOrder
 
     @getTaxCategory(@retailerRest)
@@ -136,7 +148,7 @@ class OrderDistribution extends CommonUpdater
       if error?
         deferred.reject "Error on setting sync info: " + error
       else if response.statusCode isnt 200
-        humanReadable = JSON.stringify body, null, ' '
+        humanReadable = JSON.stringify body, null, 2
         deferred.reject "Problem on setting sync info (status: #{response.statusCode}): " + humanReadable
       else
         deferred.resolve "Order sync info successfully stored."
@@ -149,7 +161,7 @@ class OrderDistribution extends CommonUpdater
       if error?
         deferred.reject "Error on importing order: " + error
       else if response.statusCode isnt 201
-        humanReadable = JSON.stringify body, null, ' '
+        humanReadable = JSON.stringify body, null, 2
         deferred.reject "Problem on importing order (status: #{response.statusCode}): " + humanReadable
       else
         deferred.resolve body
