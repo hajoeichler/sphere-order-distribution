@@ -77,12 +77,12 @@ class OrderDistribution extends CommonUpdater
 
   run: ->
     @inventoryUpdater.ensureChannelByKey(@masterClient._rest, @retailerProjectKey, CHANNEL_ROLES)
-    .then (channel) =>
-      @getUnSyncedOrders @masterClient, channel.id
-    .then (masterOrders) =>
-      @distributeOrders masterOrders
+    .then (channelInMaster) =>
+      @getUnSyncedOrders @masterClient, channelInMaster.id
+      .then (masterOrders) =>
+        @distributeOrders masterOrders, channelInMaster
 
-  distributeOrders: (masterOrders) ->
+  distributeOrders: (masterOrders, channelInMaster) ->
     if _.size(masterOrders) is 0
       Q('Nothing to do.')
     else
@@ -93,19 +93,18 @@ class OrderDistribution extends CommonUpdater
         console.error "The order '#{bad.id}' has different channels set!"
 
       distributions = _.map validOrders, (order) =>
-        @distributeOrder order
+        @distributeOrder order, channelInMaster
 
       Q.all(distributions)
 
-  distributeOrder: (masterOrder) ->
+  distributeOrder: (masterOrder, channelInMaster) ->
     masterSKUs = @extractSKUs masterOrder
 
     Q.all([
       @getTaxCategory @retailerClient
-      @inventoryUpdater.ensureChannelByKey @masterClient._rest, @retailerProjectKey, CHANNEL_ROLES
       @inventoryUpdater.ensureChannelByKey @retailerClient._rest, 'master', CHANNEL_ROLES
     ])
-    .spread (taxCategory, channelInMaster, channelInRetailer) =>
+    .spread (taxCategory, channelInRetailer) =>
       gets = _.map masterSKUs, (sku) =>
         @getRetailerProductByMasterSKU(sku)
       Q.all(gets)
