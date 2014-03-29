@@ -8,7 +8,8 @@ describe 'OrderDistribution', ->
 
 createOD = ->
   c =
-    baseConfig: {}
+    baseConfig:
+      logConfig: {}
     master:
       project_key: 'x'
       client_id: 'y'
@@ -18,29 +19,6 @@ createOD = ->
       client_id: 'b'
       client_secret: 'c'
   new OrderDistribution c
-
-describe '#run', ->
-  beforeEach ->
-    @distribution = createOD()
-
-  xit 'should throw error if callback is passed', ->
-    expect(=> @distribution.run()).toThrow new Error 'Callback must be a function!'
-
-  it 'should do nothing', (done) ->
-    @distribution.run().then (msg) ->
-      expect(msg).toBe 'Nothing to do.'
-      done()
-
-  it 'should tell that there is an order with different channels', (done) ->
-    o =
-      id: 'foo'
-      lineItems: [
-        { supplyChannel: { id: '123' } }
-        { supplyChannel: { id: '234' } }
-      ]
-    @distribution.run([o]).then (msg) ->
-      expect(msg).toEqual []
-      done()
 
 describe '#validateSameChannel', ->
   beforeEach ->
@@ -116,28 +94,6 @@ describe '#matchSKUs', ->
     expect(_.size(m2r)).toBe 2
     expect(m2r.m1).toBe 'retV2'
     expect(m2r.m2).toBe 'retV1'
-
-xdescribe '#ensureAllSKUs', ->
-  beforeEach ->
-    @distribution = createOD()
-
-  it 'should return true for empty inputs', ->
-    m2r = {}
-    skus = []
-    expect(@distribution.ensureAllSKUs(skus, m2r)).toBe true
-
-  it 'should return true if all SKUs are matched', ->
-    m2r =
-      123: 234
-    skus = [ '123' ]
-    expect(@distribution.ensureAllSKUs(skus, m2r)).toBe true
-
-  it 'should return false if not all SKUs are in the match', ->
-    m2r =
-      123: 234
-    skus = [ '123', 'foo' ]
-    expect(@distribution.ensureAllSKUs(skus, m2r)).toBe false
-
 
 describe '#replaceSKUs', ->
   beforeEach ->
@@ -218,37 +174,38 @@ xdescribe '#getUnSyncedOrders', ->
     @distribution = createOD()
 
   it 'should query orders without sync info', (done) ->
-    spyOn(@distribution.retailerRest, "GET").andCallFake((path, callback) ->
+    spyOn(@distribution.masterClient._rest, "GET").andCallFake((path, callback) ->
       body =
         results: [
-          { syncInfo: [] }
+          { syncInfo: [], lineItems: [ { supplyChannel: { id: 'someThingElseId' } } ] }
+          { syncInfo: [], lineItems: [ { supplyChannel: { id: 'myChannelId' } } ] }
           { syncInfo: [ {} ] }
         ]
       callback(null, {statusCode: 200}, body))
 
-    @distribution.getUnSyncedOrders(@distribution.retailerRest, 0).then (orders) =>
+    @distribution.getUnSyncedOrders(@distribution.masterClient, 'myChannelId')
+    .then (orders) =>
       expect(_.size(orders)).toBe 1
-      expectedURI = '/orders?limit=0&where='
-      expectedURI += encodeURIComponent "createdAt > \"#{new Date().toISOString().substring(0,10)}T00:00:00.000Z\""
-      expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(expectedURI, jasmine.any(Function))
+      expect(@distribution.masterClient._rest.GET).toHaveBeenCalledWith(/orders/, jasmine.any(Function))
       done()
     .fail (msg) ->
-      expect(true).toBe false
-      done()
+      console.error msg
+      done(msg)
 
 describe '#getRetailerProductByMasterSKU', ->
   beforeEach ->
     @distribution = createOD()
 
   it 'should query for products with several skus', (done) ->
-    spyOn(@distribution.retailerRest, "GET").andCallFake((path, callback) ->
+    spyOn(@distribution.retailerClient._rest, "GET").andCallFake((path, callback) ->
       callback(null, {statusCode: 200}, results: [{}] ))
 
     @distribution.getRetailerProductByMasterSKU('foo').then =>
       uri = "/product-projections/search?staged=true&lang=de&filter=variants.attributes.mastersku%3A%22foo%22"
-      expect(@distribution.retailerRest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
+      expect(@distribution.retailerClient._rest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
       done()
     .fail (msg) ->
+      console.error msg
       done(msg)
 
 describe '#addSyncInfo', ->
@@ -256,10 +213,10 @@ describe '#addSyncInfo', ->
     @distribution = createOD()
 
   it 'should post sync info', (done) ->
-    spyOn(@distribution.masterRest, "POST").andCallFake((path, payload, callback) ->
+    spyOn(@distribution.masterClient._rest, "POST").andCallFake((path, payload, callback) ->
       callback(null, {statusCode: 200}, null))
 
-    @distribution.addSyncInfo(@distribution.masterRest, 'x', 1, 'y', 'z').then =>
+    @distribution.addSyncInfo(@distribution.masterClient, 'x', 1, 'y', 'z').then =>
       expectedAction =
         version: 1
         actions: [
@@ -269,8 +226,8 @@ describe '#addSyncInfo', ->
             id: 'y'
           externalId: 'z'
         ]
-      expect(@distribution.masterRest.POST).toHaveBeenCalledWith("/orders/x", expectedAction, jasmine.any(Function))
+      expect(@distribution.masterClient._rest.POST).toHaveBeenCalledWith("/orders/x", JSON.stringify(expectedAction), jasmine.any(Function))
       done()
     .fail (msg) ->
-      expect(true).toBe false
-      done()
+      console.error msg
+      done(msg)

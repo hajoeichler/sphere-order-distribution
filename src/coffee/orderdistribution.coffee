@@ -1,7 +1,7 @@
-_ = require('underscore')._
-Rest = require('sphere-node-connect').Rest
+{_} = require 'underscore'
 CommonUpdater = require('sphere-node-sync').CommonUpdater
 InventoryUpdater = require('sphere-node-sync').InventoryUpdater
+SphereClient = require 'sphere-node-client'
 Q = require 'q'
 
 class OrderDistribution extends CommonUpdater
@@ -19,52 +19,55 @@ class OrderDistribution extends CommonUpdater
     retailerOpts = _.clone options.baseConfig
     retailerOpts.config = options.retailer
 
-    @retailerRest = new Rest retailerOpts
-    @inventoryUpdater = new InventoryUpdater masterOpts
-    @masterRest = @inventoryUpdater.rest
+    @masterClient = new SphereClient masterOpts
+    @retailerClient = new SphereClient retailerOpts
 
-  getUnSyncedOrders: (rest, channelId) ->
+    @logger = options.baseConfig.logConfig.logger
+    @retailerProjectKey = options.retailer.project_key
+
+    @inventoryUpdater = new InventoryUpdater masterOpts
+
+  _msgWithJSON: (msg, json) ->
+    try
+      humanReadable = JSON.stringify json, null, 2
+      "#{msg}: #{humanReadable}"
+    catch
+      "#{msg}: #{msg}"
+
+  getUnSyncedOrders: (client, channelId) ->
     deferred = Q.defer()
-    sort = encodeURIComponent "createdAt DESC"
-    query = ''
-#    if channelId?
-#      query = "&where=" + encodeURIComponent "lineItems(supplyChannel(id = \"#{channelId}\"))"
-    rest.PAGED "/orders?sort=#{sort}#{query}", (error, response, body) ->
-      if error?
-        deferred.reject "Error on fetching orders: " + error
-      else if response.statusCode isnt 200
-        humanReadable = JSON.stringify body, null, 2
-        deferred.reject "Problem on fetching orders (status: #{response.statusCode}): " + humanReadable
-      else
-        unsyncedOrders = _.filter body.results, (o) ->
-          (not o.syncInfo? or _.isEmpty(o.syncInfo)) and
-          (not _.isEmpty(o.lineItems) and o.lineItems[0].supplyChannel? and o.lineItems[0].supplyChannel.id is channelId)
-        deferred.resolve unsyncedOrders
+    client.orders.perPage(0).last('6h').fetch()
+    .then (result) ->
+      unsyncedOrders = _.filter result.results, (o) ->
+        (not o.syncInfo? or _.isEmpty(o.syncInfo)) and
+        (not _.isEmpty(o.lineItems) and o.lineItems[0].supplyChannel? and o.lineItems[0].supplyChannel.id is channelId)
+      deferred.resolve unsyncedOrders
+    .fail (err) =>
+      deferred.reject @_msgWithJSON("Problem on fetching orders (status: #{err.statusCode})", err)
     deferred.promise
 
-  getTaxCategory: (rest) ->
+  getTaxCategory: (client) ->
     deferred = Q.defer()
-    rest.GET "/tax-categories?limit=1", (error, response, body) ->
-      if error?
-        deferred.reject "Error on fetching tax category: " + error
-      else if response.statusCode isnt 200
-        humanReadable = JSON.stringify body, null, 2
-        deferred.reject "Problem on fetching tax category (status: #{response.statusCode}): " + humanReadable
+
+    client.taxCategories.perPage(1).fetch()
+    .then (result) ->
+      if _.size(result.results) is 1
+        deferred.resolve result.results[0]
       else
-        if _.size(body.results) is 1
-          deferred.resolve body.results[0]
-        else
-          deferred.reject "Can't find tax category."
+        deferred.reject "Can't find tax category."
+    .fail (err) =>
+      deferred.reject @_msgWithJSON("Problem on fetching tax category (status: #{err.statusCode})", err)
+
     deferred.promise
 
   getRetailerProductByMasterSKU: (sku) ->
     deferred = Q.defer()
     query = encodeURIComponent "variants.attributes.mastersku:\"#{sku.toLowerCase()}\""
-    @retailerRest.GET "/product-projections/search?staged=true&lang=de&filter=#{query}" , (error, response, body) ->
+    @retailerClient._rest.GET "/product-projections/search?staged=true&lang=de&filter=#{query}" , (error, response, body) =>
       if error?
-        deferred.reject "Error on fetching products: " + error
+        deferred.reject "Error on fetching products: #{error}"
       else if response.statusCode isnt 200
-        deferred.reject "Problem on fetching products (status: #{response.statusCode}): " + body
+        deferred.reject @_msgWithJSON("Problem on fetching products (status: #{response.statusCode})", body)
       else
         if _.size(body.results) is 1
           deferred.resolve body.results[0]
@@ -72,10 +75,10 @@ class OrderDistribution extends CommonUpdater
           deferred.reject "Can't find product for sku '#{sku}'."
     deferred.promise
 
-  run: () ->
-    @inventoryUpdater.ensureChannelByKey(@masterRest, @retailerRest._options.config.project_key, CHANNEL_ROLES)
+  run: ->
+    @inventoryUpdater.ensureChannelByKey(@masterClient._rest, @retailerProjectKey, CHANNEL_ROLES)
     .then (channel) =>
-      @getUnSyncedOrders @masterRest, channel.id
+      @getUnSyncedOrders @masterClient, channel.id
     .then (masterOrders) =>
       @distributeOrders masterOrders
 
@@ -97,12 +100,14 @@ class OrderDistribution extends CommonUpdater
   distributeOrder: (masterOrder) ->
     masterSKUs = @extractSKUs masterOrder
 
-    @getTaxCategory(@retailerRest)
-    .then (taxCategory) =>
-
+    Q.all([
+      @getTaxCategory @retailerClient
+      @inventoryUpdater.ensureChannelByKey @masterClient._rest, @retailerProjectKey, CHANNEL_ROLES
+      @inventoryUpdater.ensureChannelByKey @retailerClient._rest, 'master', CHANNEL_ROLES
+    ])
+    .spread (taxCategory, channelInMaster, channelInRetailer) =>
       gets = _.map masterSKUs, (sku) =>
         @getRetailerProductByMasterSKU(sku)
-
       Q.all(gets)
       .then (retailerProducts) =>
         masterSKU2retailerSKU = @matchSKUs retailerProducts
@@ -114,14 +119,9 @@ class OrderDistribution extends CommonUpdater
         @importOrder(retailerOrder)
       .then (newOrder) =>
         Q.all([
-          @inventoryUpdater.ensureChannelByKey @masterRest, @retailerRest._options.config.project_key, CHANNEL_ROLES
-          @inventoryUpdater.ensureChannelByKey @retailerRest, 'master', CHANNEL_ROLES
+          @addSyncInfo(@masterClient, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
+          @addSyncInfo(@retailerClient, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
         ])
-        .spread (channelInMaster, channelInRetailer) =>
-          Q.all([
-            @addSyncInfo(@masterRest, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
-            @addSyncInfo(@retailerRest, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
-          ])
 
   matchSKUs: (retailerProducts) ->
     allVariants = _.flatten _.map(retailerProducts, (p) -> [p.masterVariant].concat(p.variants or []))
@@ -132,8 +132,7 @@ class OrderDistribution extends CommonUpdater
       acc
     _.reduce allVariants, reducefn, {}
 
-
-  addSyncInfo: (rest, orderId, orderVersion, channelId, externalId) ->
+  addSyncInfo: (client, orderId, orderVersion, channelId, externalId) ->
     deferred = Q.defer()
     data =
       version: orderVersion
@@ -144,25 +143,20 @@ class OrderDistribution extends CommonUpdater
           id: channelId
         externalId: externalId
       ]
-    rest.POST "/orders/#{orderId}", data, (error, response, body) ->
-      if error?
-        deferred.reject "Error on setting sync info: " + error
-      else if response.statusCode isnt 200
-        humanReadable = JSON.stringify body, null, 2
-        deferred.reject "Problem on setting sync info (status: #{response.statusCode}): " + humanReadable
-      else
-        deferred.resolve "Order sync info successfully stored."
+    client.orders.byId(orderId).save(data)
+    .then ->
+      deferred.resolve "Order sync info successfully stored."
+    .fail (err) =>
+      deferred.reject @_msgWithJSON("Problem on setting sync info (status: #{err.statusCode})", err)
     deferred.promise
 
   importOrder: (order) ->
     deferred = Q.defer()
-    console.log "IMPORT %j", order
-    @retailerRest.POST "/orders/import", order, (error, response, body) ->
+    @retailerClient._rest.POST "/orders/import", order, (error, response, body) =>
       if error?
         deferred.reject "Error on importing order: " + error
       else if response.statusCode isnt 201
-        humanReadable = JSON.stringify body, null, 2
-        deferred.reject "Problem on importing order (status: #{response.statusCode}): " + humanReadable
+        deferred.reject @_msgWithJSON("Problem on importing order (status: #{response.statusCode})", body)
       else
         deferred.resolve body
     deferred.promise
@@ -183,6 +177,7 @@ class OrderDistribution extends CommonUpdater
         for p in li.variant.prices
           if p.channel?
             return false unless checkChannelId p.channel
+
     true
 
   extractSKUs: (order) ->
