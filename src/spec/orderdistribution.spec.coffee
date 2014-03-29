@@ -188,9 +188,9 @@ xdescribe '#getUnSyncedOrders', ->
       expect(_.size(orders)).toBe 1
       expect(@distribution.masterClient._rest.GET).toHaveBeenCalledWith(/orders/, jasmine.any(Function))
       done()
-    .fail (msg) ->
-      console.error msg
-      done(msg)
+    .fail (err) ->
+      console.error err
+      done err
 
 describe '#getRetailerProductByMasterSKU', ->
   beforeEach ->
@@ -204,9 +204,9 @@ describe '#getRetailerProductByMasterSKU', ->
       uri = "/product-projections/search?staged=true&lang=de&filter=variants.attributes.mastersku%3A%22foo%22"
       expect(@distribution.retailerClient._rest.GET).toHaveBeenCalledWith(uri, jasmine.any(Function))
       done()
-    .fail (msg) ->
-      console.error msg
-      done(msg)
+    .fail (err) ->
+      console.error err
+      done err
 
 describe '#addSyncInfo', ->
   beforeEach ->
@@ -228,6 +228,6 @@ describe '#addSyncInfo', ->
         ]
       expect(@distribution.masterClient._rest.POST).toHaveBeenCalledWith("/orders/x", JSON.stringify(expectedAction), jasmine.any(Function))
       done()
-    .fail (msg) ->
-      console.error msg
-      done(msg)
+    .fail (err) ->
+      console.error err
+      done err
