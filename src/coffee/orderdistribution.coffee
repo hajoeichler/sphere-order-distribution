@@ -25,6 +25,8 @@ class OrderDistribution extends CommonUpdater
     @logger = options.baseConfig.logConfig.logger
     @retailerProjectKey = options.retailer.project_key
 
+    @fetchHours = options.baseConfig.fetchHours or 24
+
     @inventoryUpdater = new InventoryUpdater masterOpts
 
   _msgWithJSON: (msg, json) ->
@@ -36,7 +38,7 @@ class OrderDistribution extends CommonUpdater
 
   getUnSyncedOrders: (client, channelId) ->
     deferred = Q.defer()
-    client.orders.perPage(0).last('6h').fetch()
+    client.orders.perPage(0).sort('id').last("#{@fetchHours}h").fetch()
     .then (result) ->
       unsyncedOrders = _.filter result.results, (o) ->
         (not o.syncInfo? or _.isEmpty(o.syncInfo)) and
