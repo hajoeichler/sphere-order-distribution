@@ -1,4 +1,4 @@
-_ = require 'underscore'
+_ = require('underscore')._
 Config = require '../config'
 OrderDistribution = require '../lib/orderdistribution'
 Q = require('q')
