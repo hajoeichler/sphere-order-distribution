@@ -1,8 +1,7 @@
 package_json = require '../package.json'
 Config = require '../config'
-Logger = require './logger'
 OrderDistribution = require '../lib/orderdistribution'
-{ProjectCredentialsConfig} = require 'sphere-node-utils'
+{Logger, ProjectCredentialsConfig} = require 'sphere-node-utils'
 
 argv = require('optimist')
   .usage('Usage: $0 --projectKey key --clientId id --clientSecret secret --logDir dir --logLevel level --timeout timeout')
@@ -22,9 +21,10 @@ argv = require('optimist')
   .argv
 
 logger = new Logger
+  name: "#{package_json.name}-#{package_json.version}:#{argv.projectKey}"
   streams: [
     { level: 'error', stream: process.stderr }
-    { level: argv.logLevel, path: "#{argv.logDir}/sphere-order-distribution_#{argv.projectKey}.log" }
+    { level: argv.logLevel, path: "#{argv.logDir}/sphere-order-distribution.log" }
   ]
 
 process.on 'SIGUSR2', ->

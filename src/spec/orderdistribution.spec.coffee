@@ -1,4 +1,4 @@
-_ = require('underscore')._
+_ = require 'underscore'
 OrderDistribution = require '../lib/orderdistribution'
 
 describe 'OrderDistribution', ->

@@ -1,4 +1,4 @@
-{_} = require 'underscore'
+_ = require 'underscore'
 CommonUpdater = require('sphere-node-sync').CommonUpdater
 InventoryUpdater = require('sphere-node-sync').InventoryUpdater
 SphereClient = require 'sphere-node-client'
