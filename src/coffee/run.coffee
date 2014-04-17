@@ -1,8 +1,7 @@
+{ExtendedLogger, ProjectCredentialsConfig} = require 'sphere-node-utils'
 package_json = require '../package.json'
 Config = require '../config'
-Logger = require './logger'
 OrderDistribution = require '../lib/orderdistribution'
-{ProjectCredentialsConfig} = require 'sphere-node-utils'
 
 argv = require('optimist')
   .usage('Usage: $0 --projectKey key --clientId id --clientSecret secret --logDir dir --logLevel level --timeout timeout')
@@ -21,24 +20,33 @@ argv = require('optimist')
   .demand(['projectKey'])
   .argv
 
-logger = new Logger
+logOptions =
+  name: "#{package_json.name}-#{package_json.version}"
   streams: [
     { level: 'error', stream: process.stderr }
-    { level: argv.logLevel, path: "#{argv.logDir}/sphere-order-distribution_#{argv.projectKey}.log" }
+    { level: argv.logLevel, path: "#{argv.logDir}/sphere-order-distribution.log" }
   ]
+logOptions.silent = argv.logSilent if argv.logSilent
+logger = new ExtendedLogger
+  additionalFields:
+    project_key: argv.projectKey
+  logConfig: logOptions
+if argv.logSilent
+  logger.bunyanLogger.trace = -> # noop
+  logger.bunyanLogger.debug = -> # noop
 
-process.on 'SIGUSR2', ->
-  logger.reopenFileStreams()
+process.on 'SIGUSR2', -> logger.reopenFileStreams()
+process.on 'exit', => process.exit(@exitCode)
 
-credentialsConfig = ProjectCredentialsConfig.create()
-.then (credentials) ->
+ProjectCredentialsConfig.create()
+.then (credentials) =>
   options =
     baseConfig:
       fetchHours: argv.fetchHours
       timeout: argv.timeout
       user_agent: "#{package_json.name} - #{package_json.version}"
       logConfig:
-        logger: logger
+        logger: logger.bunyanLogger
     master: credentials.enrichCredentials
       project_key: Config.config.project_key
       client_id: Config.config.client_id
@@ -50,13 +58,18 @@ credentialsConfig = ProjectCredentialsConfig.create()
 
   options.baseConfig.host = argv.sphereHost if argv.sphereHost?
 
-  impl = new OrderDistribution options
-  impl.run()
-  .then (msg) ->
-    logger.info info: msg, msg
-    process.exit 0
-
-.fail (err) ->
-  logger.error error: err, err
-  process.exit 1
+  orderDistribution = new OrderDistribution options
+  orderDistribution.run()
+  .then (message) =>
+    logger.info message
+    @exitCode = 0
+  .fail (error) =>
+    logger.error error, 'Oops, something went wrong!'
+    # process.exit(1)
+    @exitCode 1
+  .done()
+.fail (err) =>
+  logger.error err, "Problems on getting client credentials from config files."
+  # process.exit(1)
+  @exitCode = 1
 .done()
