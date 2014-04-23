@@ -44,11 +44,11 @@ class OrderDistribution
     ]).spread (masterChannelResult, retailerChannelResult) =>
       channelInMaster = masterChannelResult.body
       channelInRetailer = retailerChannelResult.body
-      @logger.info 'Channels ensured. About to process unsynced orders'
+      @logger.debug 'Channels ensured. About to process unsynced orders'
 
       @masterClient.orders.sort('id').last("#{@fetchHours}h").process (payload) =>
         unsyncedOrders = @_filterUnsyncedOrders payload.body.results, channelInMaster.id
-        @logger.info "About to distribute #{_.size unsyncedOrders} unsynced orders"
+        @logger.debug "About to distribute #{_.size unsyncedOrders} unsynced orders"
         @distributeOrders unsyncedOrders, channelInMaster, channelInRetailer
     .then =>
       if @summary.master.unsynced > 0
@@ -74,7 +74,7 @@ class OrderDistribution
         @logger.error {badOrders: _.map(badOrders, (o) -> o.id)}, 'There are orders with different channels set!'
 
       # process orders sequentially
-      @logger.info "About to process #{_.size validOrders} valid orders"
+      @logger.debug "About to process #{_.size validOrders} valid orders"
       Qutils.processList validOrders, (orders) =>
         throw new Error 'Orders should be processed once at a time' if orders.length isnt 1
         order = orders[0]
@@ -113,7 +113,7 @@ class OrderDistribution
           @retailerClient.orders.import(retailerOrder)
           .then (result) =>
             newOrder = result.body
-            @logger.info 'About to sync orders in master and retailer'
+            @logger.debug 'About to sync orders in master and retailer'
 
             @_updateSyncInfo(@masterClient, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
             .then (syncInMaster) =>
