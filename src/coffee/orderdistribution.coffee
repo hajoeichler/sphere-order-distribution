@@ -71,7 +71,7 @@ class OrderDistribution
 
       if _.size(badOrders) > 0
         @summary.master.bad += _.size(badOrders)
-        @logger.error {badOrders: _.map(badOrders, (o) -> o.id)}, 'There are orders with different channels set!'
+        @logger.error _.map(badOrders, (o) -> o.id), 'There are orders with different channels set!'
 
       # process orders sequentially
       @logger.debug "About to process #{_.size validOrders} valid orders"
@@ -99,7 +99,7 @@ class OrderDistribution
           memo
         , [])
         if _.size(retailerProducts) is 0
-          @logger.warn {SKUs: masterSKUs}, "No products found in retailer for matching SKUs when processing master order '#{masterOrder.id}'"
+          @logger.warn masterSKUs, "No products found in retailer for matching SKUs when processing master order '#{masterOrder.id}'"
           @summary.retailer.notFound++
           Q()
         else
