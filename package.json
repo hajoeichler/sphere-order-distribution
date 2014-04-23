@@ -1,7 +1,7 @@
 {
   "name": "sphere-order-distribution",
   "description": "Distributes your SPHERE.IO marketplace orders to the dedicated retailer.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "homepage": "https://github.com/hajoeichler/sphere-order-distribution",
   "keywords": [
     "sphere",
