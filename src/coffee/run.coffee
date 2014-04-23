@@ -58,7 +58,7 @@ ProjectCredentialsConfig.create()
 
   options.baseConfig.host = argv.sphereHost if argv.sphereHost?
 
-  orderDistribution = new OrderDistribution options
+  orderDistribution = new OrderDistribution logger, options
   orderDistribution.run()
   .then (message) =>
     logger.info message
