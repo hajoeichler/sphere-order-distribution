@@ -47,9 +47,7 @@ class OrderDistribution
       @logger.info 'Channels ensured. About to process unsynced orders'
 
       @masterClient.orders.sort('id').last("#{@fetchHours}h").process (payload) =>
-        unsyncedOrders = _.filter payload.body.results, (o) ->
-          (not o.syncInfo? or _.isEmpty(o.syncInfo)) and
-          (not _.isEmpty(o.lineItems) and o.lineItems[0].supplyChannel? and o.lineItems[0].supplyChannel.id is channelInMaster.id)
+        unsyncedOrders = @_filterUnsyncedOrders payload.body.results, channelInMaster.id
         @logger.info "About to distribute #{_.size unsyncedOrders} unsynced orders"
         @distributeOrders unsyncedOrders, channelInMaster, channelInRetailer
     .then =>
@@ -163,6 +161,11 @@ class OrderDistribution
     .fail (err) =>
       @logger.debug 'Problem on syncing order info for order #{orderId}'
       Q.reject err
+
+  _filterUnsyncedOrders: (orders, masterChannelId) ->
+    _.filter orders, (o) ->
+      (not o.syncInfo? or _.isEmpty(o.syncInfo)) and
+      (not _.isEmpty(o.lineItems) and o.lineItems[0].supplyChannel? and o.lineItems[0].supplyChannel.id is masterChannelId)
 
   _matchSKUs: (retailerProducts) ->
     allVariants = _.flatten _.map(retailerProducts, (p) -> [p.masterVariant].concat(p.variants or []))
