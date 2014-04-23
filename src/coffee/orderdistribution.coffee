@@ -1,15 +1,13 @@
-{_} = require 'underscore'
-CommonUpdater = require('sphere-node-sync').CommonUpdater
-InventoryUpdater = require('sphere-node-sync').InventoryUpdater
-SphereClient = require 'sphere-node-client'
 Q = require 'q'
+_ = require 'underscore'
+SphereClient = require 'sphere-node-client'
+{Qutils} = require 'sphere-node-utils'
 
-class OrderDistribution extends CommonUpdater
+CHANNEL_ROLES = ['InventorySupply', 'OrderExport', 'OrderImport']
 
-  CHANNEL_ROLES = ['InventorySupply', 'OrderExport', 'OrderImport']
+class OrderDistribution
 
-  constructor: (options = {}) ->
-    super(options)
+  constructor: (@logger, options = {}) ->
     throw new Error 'No base configuration in options!' unless options.baseConfig
     throw new Error 'No master configuration in options!' unless options.master
     throw new Error 'No retailer configuration in options!' unless options.retailer
@@ -22,119 +20,131 @@ class OrderDistribution extends CommonUpdater
     @masterClient = new SphereClient masterOpts
     @retailerClient = new SphereClient retailerOpts
 
-    @logger = options.baseConfig.logConfig.logger
     @retailerProjectKey = options.retailer.project_key
-
     @fetchHours = options.baseConfig.fetchHours or 24
+    @_resetSummary()
 
-    @inventoryUpdater = new InventoryUpdater masterOpts
-
-  _msgWithJSON: (msg, json) ->
-    try
-      humanReadable = JSON.stringify json, null, 2
-      "#{msg}: #{humanReadable}"
-    catch
-      "#{msg}: #{msg}"
-
-  getUnSyncedOrders: (client, channelId) ->
-    deferred = Q.defer()
-    client.orders.perPage(0).sort('id').last("#{@fetchHours}h").fetch()
-    .then (result) ->
-      unsyncedOrders = _.filter result.results, (o) ->
-        (not o.syncInfo? or _.isEmpty(o.syncInfo)) and
-        (not _.isEmpty(o.lineItems) and o.lineItems[0].supplyChannel? and o.lineItems[0].supplyChannel.id is channelId)
-      deferred.resolve unsyncedOrders
-    .fail (err) =>
-      deferred.reject @_msgWithJSON("Problem on fetching orders (status: #{err.statusCode})", err)
-    deferred.promise
-
-  getTaxCategory: (client) ->
-    deferred = Q.defer()
-
-    client.taxCategories.perPage(1).fetch()
-    .then (result) ->
-      if _.size(result.results) is 1
-        deferred.resolve result.results[0]
-      else
-        deferred.reject "Can't find tax category."
-    .fail (err) =>
-      deferred.reject @_msgWithJSON("Problem on fetching tax category (status: #{err.statusCode})", err)
-
-    deferred.promise
-
-  getRetailerProductByMasterSKU: (sku) ->
-    deferred = Q.defer()
-    query = encodeURIComponent "variants.attributes.mastersku:\"#{sku.toLowerCase()}\""
-    @retailerClient._rest.GET "/product-projections/search?staged=true&lang=de&filter=#{query}" , (error, response, body) =>
-      if error?
-        deferred.reject "Error on fetching products: #{error}"
-      else if response.statusCode isnt 200
-        deferred.reject @_msgWithJSON("Problem on fetching products (status: #{response.statusCode})", body)
-      else
-        if _.size(body.results) is 1
-          deferred.resolve body.results[0]
-        else
-          deferred.reject "Can't find product for sku '#{sku}'."
-    deferred.promise
+  _resetSummary: ->
+    @summary =
+      master:
+        unsynced: 0
+        synced: 0
+        bad: 0
+        failed: 0
+      retailer:
+        synced: 0
+        notFound: 0
+        failed: 0
 
   run: ->
-    @inventoryUpdater.ensureChannelByKey(@masterClient._rest, @retailerProjectKey, CHANNEL_ROLES)
-    .then (channelInMaster) =>
-      @getUnSyncedOrders @masterClient, channelInMaster.id
-      .then (masterOrders) =>
-        @distributeOrders masterOrders, channelInMaster
-
-  distributeOrders: (masterOrders, channelInMaster) ->
-    if _.size(masterOrders) is 0
-      Q('Nothing to do.')
-    else
-      [validOrders, badOrders] = _.partition masterOrders, (order) =>
-        @validateSameChannel order
-
-      _.each badOrders, (bad) ->
-        console.error "The order '#{bad.id}' has different channels set!"
-
-      distributions = _.map validOrders, (order) =>
-        @distributeOrder order, channelInMaster
-
-      Q.all(distributions)
-
-  distributeOrder: (masterOrder, channelInMaster) ->
-    masterSKUs = @extractSKUs masterOrder
-
+    @_resetSummary()
     Q.all([
-      @getTaxCategory @retailerClient
-      @inventoryUpdater.ensureChannelByKey @retailerClient._rest, 'master', CHANNEL_ROLES
-    ])
-    .spread (taxCategory, channelInRetailer) =>
-      gets = _.map masterSKUs, (sku) =>
-        @getRetailerProductByMasterSKU(sku)
-      Q.all(gets)
-      .then (retailerProducts) =>
-        masterSKU2retailerSKU = @matchSKUs retailerProducts
+      @masterClient.channels.ensure(@retailerProjectKey, CHANNEL_ROLES)
+      @retailerClient.channels.ensure('master', CHANNEL_ROLES)
+    ]).spread (masterChannelResult, retailerChannelResult) =>
+      channelInMaster = masterChannelResult.body
+      channelInRetailer = retailerChannelResult.body
+      @logger.info 'Channels ensured. About to process unsynced orders'
 
-        retailerOrder = @replaceSKUs masterOrder, masterSKU2retailerSKU
-        retailerOder = @replaceTaxCategories retailerOrder, taxCategory
-        retailerOrder = @removeIdsAndVariantData retailerOrder
+      @masterClient.orders.sort('id').last("#{@fetchHours}h").process (payload) =>
+        unsyncedOrders = @_filterUnsyncedOrders payload.body.results, channelInMaster.id
+        @logger.info "About to distribute #{_.size unsyncedOrders} unsynced orders"
+        @distributeOrders unsyncedOrders, channelInMaster, channelInRetailer
+    .then =>
+      if @summary.master.unsynced > 0
+        message = "Summary: there were #{@summary.master.unsynced} unsynced orders in master " +
+          "and #{@summary.master.synced} were successfully synced back to master " +
+          "(#{@summary.master.bad} were bad and #{@summary.master.failed} failed to sync), " +
+          "#{@summary.retailer.synced} were synced to retailers (#{@summary.retailer.notFound} were not matched by SKUs and " +
+          "#{@summary.retailer.failed} failed to sync)."
+      else
+        message = 'Summary: 0 unsynced orders, everything is fine.'
+      Q message
 
-        @importOrder(retailerOrder)
-      .then (newOrder) =>
-        Q.all([
-          @addSyncInfo(@masterClient, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
-          @addSyncInfo(@retailerClient, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
-        ])
+  distributeOrders: (masterOrders, channelInMaster, channelInRetailer) ->
+    if _.size(masterOrders) is 0
+      Q()
+    else
+      @summary.master.unsynced += _.size(masterOrders)
+      [validOrders, badOrders] = _.partition masterOrders, (order) =>
+        @_validateSameChannel order
 
-  matchSKUs: (retailerProducts) ->
-    allVariants = _.flatten _.map(retailerProducts, (p) -> [p.masterVariant].concat(p.variants or []))
-    reducefn = (acc, v) ->
-      a = _.find v.attributes, (a) -> a.name is 'mastersku'
-      if a?
-        acc[a.value] = v.sku
-      acc
-    _.reduce allVariants, reducefn, {}
+      if _.size(badOrders) > 0
+        @summary.master.bad += _.size(badOrders)
+        @logger.error {badOrders: _.map(badOrders, (o) -> o.id)}, 'There are orders with different channels set!'
 
-  addSyncInfo: (client, orderId, orderVersion, channelId, externalId) ->
-    deferred = Q.defer()
+      # process orders sequentially
+      @logger.info "About to process #{_.size validOrders} valid orders"
+      Qutils.processList validOrders, (orders) =>
+        throw new Error 'Orders should be processed once at a time' if orders.length isnt 1
+        order = orders[0]
+        @logger.debug order, "Processing order from master"
+        @_distributeOrder order, channelInMaster, channelInRetailer
+
+  _distributeOrder: (masterOrder, channelInMaster, channelInRetailer) ->
+    masterSKUs = @_extractSKUs masterOrder
+
+    @_getRetailerTaxCategory()
+    .then (taxCategory) =>
+      @logger.debug masterSKUs, "About to process SKUs from retailer products"
+      Qutils.processList masterSKUs, (skus) =>
+        pp = @retailerClient.productProjections.staged(true).whereOperator('or')
+        _.each skus, (sku) ->
+          pp.where("masterVariant(attributes(name = \"mastersku\" and value = \"#{sku}\"))")
+          pp.where("variants(attributes(name = \"mastersku\" and value = \"#{sku}\"))")
+        pp.fetch()
+      .then (allMatchedProductsResults) => # array of responses
+        retailerProducts = _.flatten(_.reduce allMatchedProductsResults, (memo, result) ->
+          memo.push result.body.results
+          memo
+        , [])
+        if _.size(retailerProducts) is 0
+          @logger.warn {SKUs: masterSKUs}, "No products found in retailer for matching SKUs when processing master order '#{masterOrder.id}'"
+          @summary.retailer.notFound++
+          Q()
+        else
+          @logger.debug {SKUs: masterSKUs, results: retailerProducts}, 'Found products in retailer matching SKUs'
+          masterSKU2retailerSKU = @_matchSKUs retailerProducts
+          retailerOrder = @_replaceSKUs masterOrder, masterSKU2retailerSKU
+          retailerOrder = @_replaceTaxCategories retailerOrder, taxCategory
+          retailerOrder = @_removeIdsAndVariantData retailerOrder
+
+          @logger.debug retailerOrder, 'About to import retailer order'
+          @retailerClient.orders.import(retailerOrder)
+          .then (result) =>
+            newOrder = result.body
+            @logger.info 'About to sync orders in master and retailer'
+
+            @_updateSyncInfo(@masterClient, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
+            .then (syncInMaster) =>
+              @summary.master.synced++
+              @_updateSyncInfo(@retailerClient, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
+              .then (syncInRetailer) =>
+                @summary.retailer.synced++
+                Q()
+              .fail (error) =>
+                @summary.retailer.failed++
+                @logger.error {order: retailerOrder, error: error}, 'Failed to sync retailer order, skipping...'
+                Q()
+            .fail (error) =>
+              @summary.master.failed++
+              @logger.error {order: masterOrder, error: error}, 'Failed to sync master order, skipping...'
+              Q()
+            .done()
+      , {maxParallel: 10}
+
+  _getRetailerTaxCategory: ->
+    @retailerClient.taxCategories.perPage(1).fetch()
+    .then (result) ->
+      if _.size(result.body.results) is 1
+        Q result.body.results[0]
+      else
+        Q.reject 'Can\'t find a retailer taxCategory'
+    .fail (err) =>
+      @logger.debug 'Problem on fetching retailer taxCategory'
+      Q.reject err
+
+  _updateSyncInfo: (client, orderId, orderVersion, channelId, externalId) ->
     data =
       version: orderVersion
       actions: [
@@ -145,24 +155,28 @@ class OrderDistribution extends CommonUpdater
         externalId: externalId
       ]
     client.orders.byId(orderId).save(data)
-    .then ->
-      deferred.resolve "Order sync info successfully stored."
+    .then =>
+      @logger.debug "Sync info successfully saved for order #{orderId}"
+      Q()
     .fail (err) =>
-      deferred.reject @_msgWithJSON("Problem on setting sync info (status: #{err.statusCode})", err)
-    deferred.promise
+      @logger.debug 'Problem on syncing order info for order #{orderId}'
+      Q.reject err
 
-  importOrder: (order) ->
-    deferred = Q.defer()
-    @retailerClient._rest.POST "/orders/import", order, (error, response, body) =>
-      if error?
-        deferred.reject "Error on importing order: " + error
-      else if response.statusCode isnt 201
-        deferred.reject @_msgWithJSON("Problem on importing order (status: #{response.statusCode})", body)
-      else
-        deferred.resolve body
-    deferred.promise
+  _filterUnsyncedOrders: (orders, masterChannelId) ->
+    _.filter orders, (o) ->
+      (not o.syncInfo? or _.isEmpty(o.syncInfo)) and
+      (not _.isEmpty(o.lineItems) and o.lineItems[0].supplyChannel? and o.lineItems[0].supplyChannel.id is masterChannelId)
 
-  validateSameChannel: (order) ->
+  _matchSKUs: (retailerProducts) ->
+    allVariants = _.flatten _.map(retailerProducts, (p) -> [p.masterVariant].concat(p.variants or []))
+    reducefn = (acc, v) ->
+      a = _.find v.attributes, (a) -> a.name is 'mastersku'
+      if a?
+        acc[a.value] = v.sku
+      acc
+    _.reduce allVariants, reducefn, {}
+
+  _validateSameChannel: (order) ->
     channelID = null
     checkChannelId = (channel) ->
       if channelID is null
@@ -178,13 +192,12 @@ class OrderDistribution extends CommonUpdater
         for p in li.variant.prices
           if p.channel?
             return false unless checkChannelId p.channel
-
     true
 
-  extractSKUs: (order) ->
+  _extractSKUs: (order) ->
     _.map _.filter(order.lineItems or [], (li) -> li.variant? and li.variant.sku? ), (li) -> li.variant.sku
 
-  replaceSKUs: (order, masterSKU2retailerSKU) ->
+  _replaceSKUs: (order, masterSKU2retailerSKU) ->
     if order.lineItems?
       for li in order.lineItems
         continue unless li.variant
@@ -194,13 +207,13 @@ class OrderDistribution extends CommonUpdater
 
     order
 
-  replaceTaxCategories: (order, taxCategory) ->
+  _replaceTaxCategories: (order, taxCategory) ->
     if order.shippingInfo? and order.shippingInfo.taxCategory?
       order.shippingInfo.taxCategory['id'] = taxCategory.id
 
     order
 
-  removeIdsAndVariantData: (order) ->
+  _removeIdsAndVariantData: (order) ->
     delete order.createdAt if order.createdAt?
     delete order.lastModifiedAt if order.lastModifiedAt?
     delete order.lastMessageSequenceNumber if order.lastMessageSequenceNumber?

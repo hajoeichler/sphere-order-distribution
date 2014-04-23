@@ -1,81 +1,145 @@
-_ = require('underscore')._
+Q = require 'q'
+_ = require 'underscore'
+_.mixin require('sphere-node-utils')._u
+{ExtendedLogger} = require 'sphere-node-utils'
+package_json = require '../package.json'
 Config = require '../config'
 OrderDistribution = require '../lib/orderdistribution'
-Q = require('q')
 
-# Increase timeout
-jasmine.getEnv().defaultTimeoutInterval = 20000
+uniqueId = (prefix) ->
+  _.uniqueId "#{prefix}#{new Date().getTime()}_"
+
+updatePublish = (version) ->
+  version: version
+  actions: [
+    {action: 'publish'}
+  ]
+
+updateUnpublish = (version) ->
+  version: version
+  actions: [
+    {action: 'unpublish'}
+  ]
+
+cleanup = (client, logger) ->
+  logger.debug 'Cleaning up...'
+  logger.debug 'Unpublishing all products'
+  client.products.sort('id').where('masterData(published = "true")').process (payload) ->
+    Q.all _.map payload.body.results, (product) ->
+      client.products.byId(product.id).update(updateUnpublish(product.version))
+  .then (results) ->
+    logger.debug "Unpublished #{results.length} products"
+    logger.debug 'About to delete all products'
+    client.products.perPage(0).fetch()
+  .then (payload) ->
+    logger.debug "Deleting #{payload.body.total} products"
+    Q.all _.map payload.body.results, (product) ->
+      client.products.byId(product.id).delete(product.version)
+  .then (results) ->
+    logger.debug "Deleted #{results.length} products"
+    logger.debug 'About to delete all product types'
+    client.productTypes.perPage(0).fetch()
+  .then (payload) ->
+    logger.debug "Deleting #{payload.body.total} product types"
+    Q.all _.map payload.body.results, (productType) ->
+      client.productTypes.byId(productType.id).delete(productType.version)
+  .then (results) ->
+    logger.debug "Deleted #{results.length} product types"
+    Q()
 
 describe '#distributeOrders', ->
-  beforeEach ->
+
+  beforeEach (done) ->
+    @logger = new ExtendedLogger
+      additionalFields:
+        project_key: Config.config.project_key
+      logConfig:
+        name: "#{package_json.name}-#{package_json.version}"
+        streams: [
+          { level: 'info', stream: process.stdout }
+        ]
+
     options =
       baseConfig:
-        logConfig: {}
+        logConfig:
+          logger: @logger.bunyanLogger
       master: Config.config
       retailer: Config.config
-    @distribution = new OrderDistribution options
+    @distribution = new OrderDistribution @logger, options
+    @client = @distribution.masterClient
+
+    @logger.info 'About to setup...'
+    cleanup(@client, @logger)
+    .then -> done()
+    .fail (error) -> done _.prettify error
+  , 30000 # 30sec
+
+  afterEach (done) ->
+    @logger.info 'About to cleanup...'
+    cleanup(@client, @logger)
+    .then -> done()
+    .fail (error) -> done _.prettify error
+  , 30000 # 30sec
 
   it 'Nothing to do', (done) ->
-    @distribution.distributeOrders([])
-    .then (msg) ->
-      expect(msg).toBe 'Nothing to do.'
+    @distribution.distributeOrders []
+    .then (msg) =>
+      expect(msg).not.toBeDefined()
+      expect(@distribution.summary.master.unsynced).toBe 0
       done()
-    .fail (err) ->
-      console.error err
-      done err
+    .fail (err) -> done _.prettify err
 
   it 'should distribute one order', (done) ->
-    unique = new Date().getTime()
     pt =
-      name: "PT-#{unique}"
+      name: uniqueId 'PT-'
       description: 'bla'
       attributes: [
         { name: 'mastersku', label: { de: 'Master SKU' }, type: { name: 'text' }, isRequired: false, inputHint: 'SingleLine' }
       ]
-    console.log 0
-    @distribution.masterClient.productTypes.save(pt)
+    @logger.debug 'About to create product type'
+    @client.productTypes.save(pt)
     .then (result) =>
-      console.log 1
-      pt = result
+      @productType = result.body
+      @masterSku = uniqueId 'masterSku-'
       pMaster =
         productType:
           typeId: 'product-type'
-          id: pt.id
+          id: @productType.id
         name:
-          en: "Master-P-#{unique}"
+          en: uniqueId 'masterP-'
         slug:
-          en: "master-p-#{unique}"
+          en: uniqueId 'masterS-'
         masterVariant:
-          sku: "masterSku#{unique}"
-      @distribution.masterClient.products.save(pMaster)
-    .then (result) =>
-      console.log 2
+          sku: @masterSku
+      @logger.debug {product: pMaster}, 'About to save master product'
+      @client.products.save(pMaster)
+    .then =>
       pRetailer =
         productType:
           typeId: 'product-type'
-          id: pt.id
+          id: @productType.id
         name:
-          en: "P-#{unique}"
+          en: uniqueId 'P-'
         slug:
-          en: "p-#{unique}"
+          en: uniqueId 'S-'
         masterVariant:
-          sku: "retailerSku#{unique}"
+          sku: uniqueId 'retailerSku-'
           attributes: [
-            { name: 'mastersku', value: "masterSku#{unique}"  }
+            { name: 'mastersku', value: @masterSku }
           ]
-      @distribution.retailerClient.products.save(pRetailer)
+      @logger.debug {product: pRetailer}, 'About to save retailer product'
+      @client.products.save(pRetailer)
+    .then =>
+      @client.channels.ensure(@distribution.retailerProjectKey, ['InventorySupply', 'OrderExport', 'OrderImport'])
     .then (result) =>
-      console.log 3
-      @distribution.inventoryUpdater.ensureChannelByKey(@distribution.masterClient._rest, @distribution.retailerProjectKey)
-    .then (channel) =>
-      console.log 4
-      o =
+      channel = result.body
+      order =
         lineItems: [ {
           supplyChannel:
             id: channel.id
             typeId: 'channel'
           variant:
-            sku: "masterSku#{unique}"
+            sku: @masterSku
           name:
             de: 'foo'
           taxRate:
@@ -92,21 +156,19 @@ describe '#distributeOrders', ->
         totalPrice:
           currencyCode: 'EUR'
           centAmount: 999
-      @distribution.importOrder(o)
-    .then (order) =>
-      console.log 5
-      @distribution.run().then (msg) =>
-        console.log 6
-        expect(msg).toEqual [ [ 'Order sync info successfully stored.', 'Order sync info successfully stored.'] ]
-        @distribution.masterClient.orders.byId(order.id).fetch()
-        .then (result) =>
-          console.log 7
-          expect(result.syncInfo).toBeDefined()
-          @distribution.retailerClient.orders.where("syncInfo(externalId = \"#{order.id}\")").fetch()
-          .then (result) ->
-            console.log 8
-            expect(result.total).toBe 1
-            done()
-    .fail (err) ->
-      console.error err
-      done err
+      @client.orders.import(order)
+    .then (result) =>
+      importedOrder = result.body
+      @distribution.run()
+      .then (msg) =>
+        expect(msg).toMatch /Summary\: there were (\d)+ unsynced orders in master and 1 were successfully synced back to master \(0 were bad and 0 failed to sync\), 1 were synced to retailers \((\d)+ were not matched by SKUs and 0 failed to sync\)/
+        @client.orders.byId(importedOrder.id).fetch()
+      .then (result) =>
+        syncedOrder = result.body
+        expect(syncedOrder.syncInfo).toBeDefined()
+        @client.orders.where("syncInfo(externalId = \"#{syncedOrder.id}\")").fetch()
+      .then (result) ->
+        expect(result.body.total).toBe 1
+        done()
+    .fail (err) -> done _.prettify err
+  , 30000 # 30sec
