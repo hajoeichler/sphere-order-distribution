@@ -99,7 +99,7 @@ class OrderDistribution
           memo
         , [])
         if _.size(retailerProducts) is 0
-          @logger.warn masterSKUs, "No products found in retailer for matching SKUs when processing master order '#{masterOrder.id}'"
+          @logger.error masterSKUs, "No products found in retailer for matching SKUs when processing master order '#{masterOrder.id}'"
           @summary.retailer.notFound++
           Q()
         else
