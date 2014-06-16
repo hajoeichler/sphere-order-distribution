@@ -2,7 +2,8 @@
   "name": "sphere-order-distribution",
   "description": "Distributes your SPHERE.IO marketplace orders to the dedicated retailer.",
   "version": "0.2.2",
-  "homepage": "https://github.com/hajoeichler/sphere-order-distribution",
+  "homepage": "https://github.com/sphereio/sphere-order-distribution",
+  "private": true,
   "keywords": [
     "sphere",
     "api"
@@ -11,17 +12,23 @@
     "name": "Hajo Eichler",
     "email": "hajo.eichler@commercetools.de"
   },
+  "contributors": [
+    {
+      "name": "Nicola Molinari",
+      "email": "nicola.molinari@commercetools.de"
+    }
+  ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/hajoeichler/sphere-order-distribution.git"
+    "url": "https://github.com/sphereio/sphere-order-distribution.git"
   },
   "bugs": {
-    "url": "https://github.com/hajoeichler/sphere-order-distribution/issues"
+    "url": "https://github.com/sphereio/sphere-order-distribution/issues"
   },
   "licenses": [
     {
       "type": "MIT",
-      "url": "https://github.com/hajoeichler/sphere-order-distribution/blob/master/LICENSE-MIT"
+      "url": "https://github.com/sphereio/sphere-order-distribution/blob/master/LICENSE-MIT"
     }
   ],
   "main": "main.js",
