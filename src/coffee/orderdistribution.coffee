@@ -116,10 +116,10 @@ class OrderDistribution
             @logger.debug 'About to sync orders in master and retailer'
 
             @_updateSyncInfo(@masterClient, masterOrder.id, masterOrder.version, channelInMaster.id, newOrder.id)
-            .then (syncInMaster) =>
+            .then =>
               @summary.master.synced++
               @_updateSyncInfo(@retailerClient, newOrder.id, newOrder.version, channelInRetailer.id, masterOrder.id)
-              .then (syncInRetailer) =>
+              .then =>
                 @summary.retailer.synced++
                 Q()
               .fail (error) =>
@@ -130,7 +130,6 @@ class OrderDistribution
               @summary.master.failed++
               @logger.error {order: masterOrder, error: error}, 'Failed to sync master order, skipping...'
               Q()
-            .done()
       , {maxParallel: 10}
 
   _getRetailerTaxCategory: ->
@@ -159,7 +158,7 @@ class OrderDistribution
       @logger.debug "Sync info successfully saved for order #{orderId}"
       Q()
     .fail (err) =>
-      @logger.debug 'Problem on syncing order info for order #{orderId}'
+      @logger.debug "Problem on syncing order info for order #{orderId}"
       Q.reject err
 
   _filterUnsyncedOrders: (orders, masterChannelId) ->
