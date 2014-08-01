@@ -153,7 +153,7 @@ class OrderDistribution
           id: channelId
         externalId: externalId
       ]
-    client.orders.byId(orderId).save(data)
+    client.orders.byId(orderId).update(data)
     .then =>
       @logger.debug "Sync info successfully saved for order #{orderId}"
       Q()
